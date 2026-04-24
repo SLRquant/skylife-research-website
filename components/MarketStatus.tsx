@@ -13,13 +13,11 @@ function computeStatus() {
   const mins = h * 60 + m;
   const weekday = day >= 1 && day <= 5;
   const open = weekday && mins >= 555 && mins <= 930; // 09:15 -> 15:30
-  const hh = String(h).padStart(2, "0");
-  const mm = String(m).padStart(2, "0");
-  return { label: `NSE ${open ? "OPEN" : "CLOSED"} · ${hh}:${mm} IST`, open };
+  return { label: `NSE ${open ? "OPEN" : "CLOSED"}`, open };
 }
 
 export function MarketStatus() {
-  const [state, setState] = useState({ label: "NSE · — IST", open: false });
+  const [state, setState] = useState({ label: "NSE", open: false });
 
   useEffect(() => {
     setState(computeStatus());

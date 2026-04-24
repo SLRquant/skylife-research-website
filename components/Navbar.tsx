@@ -35,14 +35,14 @@ export function Navbar() {
           <Link href="/#platform" onClick={closeMenu}>
             Platform
           </Link>
+          <Link href="/network-graph" onClick={closeMenu}>
+            Network Graph
+          </Link>
           <Link href="/#methodology" onClick={closeMenu}>
             Methodology
           </Link>
           <Link href="/#pricing" onClick={closeMenu}>
             Pricing
-          </Link>
-          <Link href="/#faq" onClick={closeMenu}>
-            Research
           </Link>
           <Link href="/#contact" onClick={closeMenu}>
             Contact

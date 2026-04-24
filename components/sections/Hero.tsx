@@ -32,8 +32,8 @@ export function Hero() {
               <Link className="btn btn-primary btn-lg" href="#pricing">
                 For individual traders <span className="arr">→</span>
               </Link>
-              <Link className="btn btn-ghost btn-lg" href="#contact">
-                For funds &amp; desks <span className="arr">→</span>
+              <Link className="btn btn-ghost btn-lg" href="/network-graph">
+                Open network graph <span className="arr">→</span>
               </Link>
               <Link className="link-arrow" href="#contact">
                 Book a 20-min walkthrough →
