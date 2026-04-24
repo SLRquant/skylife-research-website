@@ -73,9 +73,17 @@ export function NetworkGraphTool() {
       try {
         const res = await fetch("/api/network-graph", { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = (await res.json()) as GraphPayload;
+        const json = (await res.json()) as Partial<GraphPayload>;
+        if (!json || !Array.isArray(json.nodes) || !Array.isArray(json.edges)) {
+          throw new Error("Malformed graph response");
+        }
+        const safe: GraphPayload = {
+          nodes: json.nodes as GraphNode[],
+          edges: json.edges as GraphEdge[],
+          meta: (json.meta ?? {}) as GraphMeta,
+        };
         if (!abort) {
-          setData(json);
+          setData(safe);
           setLoading(false);
         }
       } catch (e) {
