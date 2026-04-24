@@ -100,7 +100,20 @@ function normalize(payload: UpstreamPayload) {
     };
   });
 
-  const edges = rawEdges.map((e) => ({
+  // Prune to strongest edges per node so layout doesn't collapse (MST-ish)
+  // Keep edges above threshold OR top-K per node.
+  const TOP_PER_NODE = 4;
+  const adj = new Map<string, { e: UpstreamEdge; other: string }[]>();
+  for (const e of rawEdges) {
+    (adj.get(e.source) ?? adj.set(e.source, []).get(e.source)!).push({ e, other: e.target });
+    (adj.get(e.target) ?? adj.set(e.target, []).get(e.target)!).push({ e, other: e.source });
+  }
+  const keep = new Set<UpstreamEdge>();
+  for (const [, list] of adj) {
+    list.sort((a, b) => b.e.weight - a.e.weight);
+    for (let i = 0; i < Math.min(TOP_PER_NODE, list.length); i++) keep.add(list[i].e);
+  }
+  const edges = Array.from(keep).map((e) => ({
     source: e.source,
     target: e.target,
     weight: e.weight,

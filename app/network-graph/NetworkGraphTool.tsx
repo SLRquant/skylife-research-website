@@ -175,22 +175,29 @@ function GraphCanvas({
   useEffect(() => {
     const clusterIds = Array.from(new Set(data.nodes.map((n) => n.cluster)));
     const clusterCenters = new Map<number, { x: number; y: number }>();
+    const singleCluster = clusterIds.length <= 1;
     const R = Math.min(CANVAS_W, CANVAS_H) * 0.32;
     clusterIds.forEach((cid, i) => {
-      const a = (i / clusterIds.length) * Math.PI * 2 - Math.PI / 2;
-      clusterCenters.set(cid, {
-        x: CANVAS_W / 2 + Math.cos(a) * R,
-        y: CANVAS_H / 2 + Math.sin(a) * R,
-      });
+      if (singleCluster) {
+        clusterCenters.set(cid, { x: CANVAS_W / 2, y: CANVAS_H / 2 });
+      } else {
+        const a = (i / clusterIds.length) * Math.PI * 2 - Math.PI / 2;
+        clusterCenters.set(cid, {
+          x: CANVAS_W / 2 + Math.cos(a) * R,
+          y: CANVAS_H / 2 + Math.sin(a) * R,
+        });
+      }
     });
 
+    // Spread initial positions across full canvas when single cluster
+    const spread = singleCluster ? Math.min(CANVAS_W, CANVAS_H) * 0.38 : 20;
     const nodes: SimNode[] = data.nodes.map((n, i) => {
       const c = clusterCenters.get(n.cluster)!;
       const theta = (i / data.nodes.length) * Math.PI * 2;
       return {
         ...n,
-        x: c.x + Math.cos(theta) * 20 + (Math.random() - 0.5) * 10,
-        y: c.y + Math.sin(theta) * 20 + (Math.random() - 0.5) * 10,
+        x: c.x + Math.cos(theta) * spread + (Math.random() - 0.5) * 10,
+        y: c.y + Math.sin(theta) * spread + (Math.random() - 0.5) * 10,
         vx: 0,
         vy: 0,
         r: 4 + n.centrality * 14,
@@ -245,15 +252,15 @@ function GraphCanvas({
           let dy = a.y - b.y;
           let d2 = dx * dx + dy * dy;
           if (d2 < 1) d2 = 1;
-          if (d2 > 40000) continue;
+          if (d2 > 90000) continue;
           const f = REPEL / d2;
           const d = Math.sqrt(d2);
           dx /= d;
           dy /= d;
-          a.vx += dx * f * 0.01;
-          a.vy += dy * f * 0.01;
-          b.vx -= dx * f * 0.01;
-          b.vy -= dy * f * 0.01;
+          a.vx += dx * f * 0.018;
+          a.vy += dy * f * 0.018;
+          b.vx -= dx * f * 0.018;
+          b.vy -= dy * f * 0.018;
         }
       }
       // edge springs
