@@ -1,40 +1,32 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { usePulse } from "@/lib/usePulse";
-import { CountUp } from "@/components/CountUp";
 
-const EASE = [0.16, 1, 0.3, 1] as const;
-
-/**
- * How the engine actually works — every claim here is something the code does.
- * (The previous copy advertised a NIFTY-500 universe, 2018 history, and intraday
- * cluster-breakdown alerts. None of those exist.)
- */
+/** Every claim here is something the code actually does. */
 const STEPS = [
   {
     n: "01",
-    tag: "RETURNS",
     title: "Log returns, session-aligned",
     body:
-      "Every stock's OHLCV is resampled from 1-minute bars to your interval, then converted to log returns over a trailing window you choose — 60 bars by default.",
-    metric: ["Intervals", "1m → 1w"],
+      "Every stock's OHLCV is resampled from 1-minute bars to your interval, then converted to log returns over a trailing window you choose. The window is the single most consequential parameter in the whole pipeline, which is why we let you move it and watch what happens.",
+    k: "Intervals",
+    v: "1m · 5m · 15m · 1h · 1d",
   },
   {
     n: "02",
-    tag: "GRAPH",
     title: "Correlation becomes structure",
     body:
-      "Pearson (or Spearman) correlation across the window gives a dense matrix. We sparsify it into a graph — a Mantegna minimum spanning tree by default, or kNN, threshold, or complete.",
-    metric: ["Methods", "MST · kNN · θ"],
+      "Pearson (or Spearman) correlation across the window gives a dense matrix. We sparsify it into a graph — a Mantegna minimum spanning tree by default, or kNN, threshold, or complete. The sparsifier is a choice, and it is yours.",
+    k: "Methods",
+    v: "MST · kNN · θ · complete",
   },
   {
     n: "03",
-    tag: "CENTRALITY",
     title: "Where each stock sits",
     body:
-      "Louvain finds the communities; five centrality measures score each stock's position — eigenvector, PageRank, degree strength, betweenness, closeness. Rebuilt per as-of day, so you see it move.",
-    metric: ["Metrics", "5 per stock"],
+      "Louvain finds the communities; five centrality measures score each stock's position — eigenvector, PageRank, degree strength, betweenness, closeness. Rebuilt per as-of day, with a fixed seed, so the partition does not shuffle between calls.",
+    k: "Metrics",
+    v: "5 per stock",
   },
 ];
 
@@ -44,77 +36,59 @@ export function Methodology() {
   return (
     <section id="methodology" className="section">
       <div className="wrap">
-        <motion.div
-          className="sec-head"
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.4 }}
-          transition={{ duration: 0.6, ease: EASE }}
-        >
+        <div className="sec-head">
           <div>
-            <div className="sec-eyebrow mono">◉ HOW IT WORKS</div>
-            <h2 className="sec-title">
-              Prices in. <em>Structure out.</em>
-            </h2>
+            <span className="label">How it works</span>
+            <h2 className="sec-title unfurl">Prices in. Structure out.</h2>
           </div>
           <p className="sec-desc">
-            Most signals stop at the stock. Ours start at the{" "}
-            <span className="em-strong">edges</span> between them — and no step is a black box.
+            Most signals stop at the stock. Ours start at the edges between them — and no step is
+            a black box.
           </p>
-        </motion.div>
+        </div>
 
         <div className="steps">
           {STEPS.map((s, i) => (
-            <motion.div
-              key={s.n}
-              className="step"
-              initial={{ opacity: 0, y: 22 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.55, ease: EASE, delay: i * 0.08 }}
-            >
+            <div className="step" key={s.n}>
               <div className="step-rail">
-                <span className="step-n mono">{s.n}</span>
+                <span className="step-n">{s.n}</span>
                 {i < STEPS.length - 1 && <span className="step-line" />}
               </div>
               <div className="step-body">
-                <div className="step-tag mono">{s.tag}</div>
                 <h3>{s.title}</h3>
                 <p>{s.body}</p>
                 <div className="step-metric">
-                  <span className="mono dim">{s.metric[0]}</span>
-                  <b className="mono">{s.metric[1]}</b>
+                  <span className="label">{s.k}</span>
+                  <span>{s.v}</span>
                 </div>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
 
-        <motion.div
-          className="coverage"
-          initial={{ opacity: 0, y: 18 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.6, ease: EASE }}
-        >
+        <div className="coverage">
           <div className="cov">
-            <div className="cov-label mono">COVERAGE</div>
+            <span className="label">Coverage</span>
             <div className="cov-val">NIFTY 50</div>
-            <div className="cov-sub">
-              <CountUp value={pulse?.stocks} /> tradable names · NSE
-            </div>
+            <p>
+              <span className="sig">{pulse?.stocks ?? "—"}</span> tradable names on NSE. TMPV is
+              excluded — it has no price history, and we would rather drop a name than fake one.
+            </p>
           </div>
           <div className="cov">
-            <div className="cov-label mono">GRANULARITY</div>
+            <span className="label">Granularity</span>
             <div className="cov-val">1-minute</div>
-            <div className="cov-sub">Resampled to any interval, 1m → 1w</div>
+            <p>Resampled to any interval from 1m to 1d. Nothing is interpolated.</p>
           </div>
           <div className="cov">
-            <div className="cov-label mono">HISTORY</div>
+            <span className="label">History</span>
             <div className="cov-val">2025 →</div>
-            <div className="cov-sub">Rebuilt every session, not backfilled</div>
+            <p>
+              Rebuilt every session, not backfilled. We have no history before 2025 and we do not
+              claim any.
+            </p>
           </div>
-        </motion.div>
+        </div>
       </div>
     </section>
   );

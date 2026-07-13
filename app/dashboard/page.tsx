@@ -1,6 +1,7 @@
 "use client";
 
 import { Navbar } from "@/components/Navbar";
+import { Plate } from "@/components/Plate";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { useAuth } from "@/lib/firebase/AuthProvider";
 import { getFirebaseAuth } from "@/lib/firebase/client";
@@ -20,8 +21,7 @@ export default function DashboardPage() {
 
   return (
     <>
-      <div className="grid-bg" aria-hidden="true" />
-      <div className="glow" aria-hidden="true" />
+      <Plate />
       <Navbar />
       <ProtectedRoute>
         <main className="dash-wrap">

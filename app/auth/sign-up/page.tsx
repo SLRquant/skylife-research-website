@@ -13,6 +13,7 @@ import {
 } from "@/lib/firebase/client";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { Navbar } from "@/components/Navbar";
+import { Plate } from "@/components/Plate";
 import { GoogleButton } from "@/components/GoogleButton";
 
 const schema = z.object({
@@ -50,8 +51,7 @@ export default function SignUpPage() {
 
   return (
     <>
-      <div className="grid-bg" aria-hidden="true" />
-      <div className="glow" aria-hidden="true" />
+      <Plate />
       <Navbar />
       <main className="auth-wrap">
         <div className="auth-card">
@@ -69,12 +69,12 @@ export default function SignUpPage() {
           <div className="auth-divider"><span>or</span></div>
 
           <form
-            className="contact-form"
+            
             onSubmit={handleSubmit(onSubmit)}
             noValidate
           >
-            <label>
-              <span>Email</span>
+            <label className="field">
+              <span className="label">Email</span>
               <input
                 type="email"
                 autoComplete="email"
@@ -84,8 +84,8 @@ export default function SignUpPage() {
             {errors.email && (
               <span className="form-err">{errors.email.message}</span>
             )}
-            <label>
-              <span>Password</span>
+            <label className="field">
+              <span className="label">Password</span>
               <input
                 type="password"
                 autoComplete="new-password"

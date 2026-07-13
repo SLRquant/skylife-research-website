@@ -4,45 +4,27 @@ import { useEffect, useState } from "react";
 
 function computeStatus() {
   const now = new Date();
-  // IST = UTC + 5:30
-  const istMs = now.getTime() + (now.getTimezoneOffset() + 330) * 60000;
-  const ist = new Date(istMs);
+  const ist = new Date(now.getTime() + (now.getTimezoneOffset() + 330) * 60000); // IST = UTC+5:30
   const day = ist.getUTCDay();
-  const h = ist.getUTCHours();
-  const m = ist.getUTCMinutes();
-  const mins = h * 60 + m;
-  const weekday = day >= 1 && day <= 5;
-  const open = weekday && mins >= 555 && mins <= 930; // 09:15 -> 15:30
-  return { label: `NSE ${open ? "OPEN" : "CLOSED"}`, open };
+  const mins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  const open = day >= 1 && day <= 5 && mins >= 555 && mins <= 930; // 09:15 -> 15:30
+  return { label: open ? "NSE OPEN" : "NSE CLOSED", open };
 }
 
 export function MarketStatus() {
+  // render the same thing on server and first client paint, then correct it
   const [state, setState] = useState({ label: "NSE", open: false });
 
   useEffect(() => {
     setState(computeStatus());
-    const id = setInterval(() => setState(computeStatus()), 30000);
+    const id = setInterval(() => setState(computeStatus()), 30_000);
     return () => clearInterval(id);
   }, []);
 
   return (
-    <div
-      className="status-pill"
-      aria-live="polite"
-      style={{
-        ["--dot-color" as string]: state.open
-          ? "var(--accent-2)"
-          : "var(--mute-2)",
-      }}
-    >
-      <span
-        className="dot"
-        style={{
-          background: state.open ? "var(--accent-2)" : "var(--mute-2)",
-          boxShadow: state.open ? "0 0 10px var(--accent-2)" : "none",
-        }}
-      />
-      <span>{state.label}</span>
-    </div>
+    <span className="status" aria-live="polite">
+      <span className={`led${state.open ? " on" : ""}`} />
+      {state.label}
+    </span>
   );
 }

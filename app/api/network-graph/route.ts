@@ -1,12 +1,28 @@
 /**
- * GET /api/network-graph — the real NIFTY-50 correlation network.
+ * GET /api/network-graph[?lookback=NN] — the real NIFTY-50 correlation network.
  *
- * This used to proxy api.skyliferesearch.com/network-graph, which returns 403 — so the page
- * ALWAYS fell through to lib/sample-graph.ts and showed invented numbers (RELIANCE c=0.84,
- * modularity 0.452) to every visitor. It now reads the same engine as everything else.
+ * Public, so the params are FIXED here and `lookback` is restricted to a WHITELIST: a visitor
+ * cannot use this to drive arbitrary (metered) queries against the upstream API. Each of the 8
+ * allowed values is cached for an hour independently.
  *
- * Public, so it is cached for an hour and its params are fixed here — a visitor cannot use it
- * to drive arbitrary (metered) queries against the upstream API.
+ * WHY LOOKBACK IS A REAL AXIS, AND WHY IT IS THE ONE WE EXPOSE
+ * ------------------------------------------------------------
+ * The upstream `include_graph` returns the edge list for the LATEST as-of date only (see its
+ * OpenAPI: "rolling: latest as-of date only") and there is no `asof`/`end_date` parameter. So a
+ * genuine sequence of graphs THROUGH TIME cannot be obtained from this API, and we will not
+ * invent one — a fabricated time axis on a quant site is exactly the lie the brand refuses.
+ *
+ * What IS real, and is recomputed by the engine from scratch on every call, is the ESTIMATION
+ * WINDOW: the number of trailing bars the correlation matrix is built from. Sweeping it produces
+ * genuinely different graphs of the same 49 names, and the differences are large and honest:
+ *
+ *     lookback  30 vs  60 :  62% of the edge union changes
+ *     lookback  60 vs 120 :  63%
+ *     lookback  30 vs 120 :  75%
+ *     most-central stock:  JIOFIN (30 bars) -> SHRIRAMFIN (60) -> BAJAJFINSV (120)
+ *
+ * That is the axis the morph engine scrubs. Displacement under it = how much of a stock's
+ * structural role is real, and how much is an artefact of the window you happened to pick.
  */
 import { NextResponse } from "next/server";
 
@@ -16,22 +32,22 @@ export const maxDuration = 60;
 
 const BASE = process.env.GRAPH_STATS_API_BASE ?? "https://graph-api.skyliferesearch.com";
 
-const CLUSTER_COLORS = [
-  "#4dd4ac", "#6ea8fe", "#e879f9", "#fbbf24",
-  "#fb7185", "#818cf8", "#34d399", "#f97316",
-];
+/** The only lookbacks a visitor may ask for. 8 cached variants, nothing else reaches upstream. */
+export const LOOKBACKS = [30, 40, 50, 60, 75, 90, 105, 120] as const;
+const DEFAULT_LOOKBACK = 60;
 
-const color = (c: number) => CLUSTER_COLORS[(c - 1 + CLUSTER_COLORS.length) % CLUSTER_COLORS.length];
-
-export async function GET() {
+export async function GET(req: Request) {
   const key = process.env.GRAPH_STATS_API_KEY;
+
+  const asked = Number(new URL(req.url).searchParams.get("lookback"));
+  const lookback = (LOOKBACKS as readonly number[]).includes(asked) ? asked : DEFAULT_LOOKBACK;
 
   const q = new URLSearchParams({
     interval: "1d",
-    lookback: "60",
+    lookback: String(lookback),
     periods: "1",
     metrics: "eigenvector_centrality",
-    graph_method: "knn",   // knn gives a richer, more readable web than an MST tree
+    graph_method: "knn", // knn gives a richer, more readable web than an MST tree
     knn_k: "4",
     include_graph: "true",
   });
@@ -55,25 +71,21 @@ export async function GET() {
     const cents = d.stocks.map((s: { eigenvector_centrality: number }) => s.eigenvector_centrality ?? 0);
     const maxC = Math.max(...cents, 1e-9);
 
-    const nodes = d.stocks.map((s: { symbol: string; eigenvector_centrality: number | null }) => {
-      const cluster = communities[s.symbol] ?? 0;
-      return {
-        id: s.symbol,
-        symbol: s.symbol,
-        name: s.symbol,
-        cluster,
-        clusterLabel: `C${cluster}`,
-        clusterColor: color(cluster),
-        centrality: (s.eigenvector_centrality ?? 0) / maxC, // normalized -> drives node size
-        momentum: 0,
-      };
-    });
+    const nodes = d.stocks.map((s: { symbol: string; eigenvector_centrality: number | null }) => ({
+      id: s.symbol,
+      symbol: s.symbol,
+      name: s.symbol,
+      cluster: communities[s.symbol] ?? 0,
+      centrality: (s.eigenvector_centrality ?? 0) / maxC, // normalised -> drives node size
+      raw: s.eigenvector_centrality ?? 0,
+    }));
 
     const edges = (d.graph.edge_list ?? []).map(
-      (e: { source: string; target: string; weight: number }) => ({
+      (e: { source: string; target: string; weight: number; corr?: number }) => ({
         source: e.source,
         target: e.target,
         weight: e.weight,
+        corr: e.corr ?? e.weight,
       })
     );
 
@@ -83,19 +95,16 @@ export async function GET() {
         edges,
         meta: {
           universe: "NIFTY 50",
-          method: "Correlation network · Louvain communities",
-          lookbackDays: 60,
+          method: "knn k=4 · pearson · Louvain",
+          lookback,
+          interval: "1d",
           clustersDetected: d.graph.n_communities ?? 0,
           modularity: d.graph.modularity ?? undefined,
           asOf: d.asof_date ?? undefined,
           fallback: false,
         },
       },
-      {
-        headers: {
-          "Cache-Control": `public, s-maxage=${revalidate}, stale-while-revalidate=86400`,
-        },
-      }
+      { headers: { "Cache-Control": `public, s-maxage=${revalidate}, stale-while-revalidate=86400` } }
     );
   } catch (e) {
     // Surface the failure instead of quietly serving invented numbers as if they were real.
@@ -104,7 +113,7 @@ export async function GET() {
       {
         nodes: [],
         edges: [],
-        meta: { universe: "NIFTY 50", fallback: true, error: "Live graph unavailable." },
+        meta: { universe: "NIFTY 50", lookback, fallback: true, error: "Live graph unavailable." },
       },
       { status: 200, headers: { "Cache-Control": "public, s-maxage=60" } }
     );
