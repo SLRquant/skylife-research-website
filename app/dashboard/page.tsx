@@ -6,6 +6,7 @@ import { useAuth } from "@/lib/firebase/AuthProvider";
 import { getFirebaseAuth } from "@/lib/firebase/client";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 export default function DashboardPage() {
   const { user, configured } = useAuth();
@@ -41,14 +42,14 @@ export default function DashboardPage() {
                 Welcome back{user?.email ? `, ${user.email}` : ""}.
               </h1>
               <p className="dim" style={{ maxWidth: 560, marginBottom: 24 }}>
-                This is a stub dashboard. Wire up your clusters feed, portfolio
-                analyzer, and momentum signals here — each gets its own route
-                under <span className="mono">/dashboard/*</span>.
+                Your research tools. Graph Stats tracks each stock&apos;s centrality
+                in the NIFTY-50 correlation network over time — who is becoming a
+                hub, and who is drifting to the edge.
               </p>
               <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button className="btn btn-primary" disabled>
-                  Open network graph →
-                </button>
+                <Link className="btn btn-primary" href="/dashboard/graph-stats">
+                  Open Graph Stats →
+                </Link>
                 <button
                   className="btn btn-ghost"
                   onClick={handleSignOut}

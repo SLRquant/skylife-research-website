@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { GraphCanvas } from "@/components/GraphCanvas";
 
 /* ---------- Types ---------- */
 
@@ -40,25 +41,6 @@ type GraphPayload = {
   meta: GraphMeta;
 };
 
-type SimNode = GraphNode & {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  r: number;
-};
-
-/* ---------- Layout constants ---------- */
-
-const CANVAS_W = 900;
-const CANVAS_H = 640;
-const REPEL = 850;
-const SPRING = 0.045;
-const SPRING_REST = 68;
-const CLUSTER_PULL = 0.004;
-const DAMPING = 0.86;
-const CENTER_PULL = 0.002;
-
 /* ---------- Component ---------- */
 
 export function NetworkGraphTool() {
@@ -77,13 +59,12 @@ export function NetworkGraphTool() {
         if (!json || !Array.isArray(json.nodes) || !Array.isArray(json.edges)) {
           throw new Error("Malformed graph response");
         }
-        const safe: GraphPayload = {
-          nodes: json.nodes as GraphNode[],
-          edges: json.edges as GraphEdge[],
-          meta: (json.meta ?? {}) as GraphMeta,
-        };
         if (!abort) {
-          setData(safe);
+          setData({
+            nodes: json.nodes as GraphNode[],
+            edges: json.edges as GraphEdge[],
+            meta: (json.meta ?? {}) as GraphMeta,
+          });
           setLoading(false);
         }
       } catch (e) {
@@ -106,13 +87,13 @@ export function NetworkGraphTool() {
             <div className="eyebrow" style={{ marginBottom: 8 }}>
               <span className="eb-primary">● LIVE TOOL</span>
               <span className="sep">/</span>
-              <span>NIFTY momentum network</span>
+              <span>NIFTY-50 correlation network</span>
             </div>
             <h1 className="tool-title">Network Graph</h1>
             <p className="tool-sub">
-              Stocks plotted by correlation structure. Clusters are detected via
-              Louvain; node size is eigenvector centrality; edge weight is
-              correlation over the last 63 sessions.
+              The NIFTY-50 plotted by correlation structure. Clusters are detected via Louvain;
+              node size is eigenvector centrality; edge weight is |correlation| over the last 60
+              sessions.
             </p>
           </div>
           <Link href="/" className="btn btn-ghost tool-back" aria-label="Back">
@@ -124,337 +105,34 @@ export function NetworkGraphTool() {
           <div className="tool-canvas-wrap">
             {loading && <LoadingOverlay />}
             {error && !data && <ErrorState message={error} />}
-            {data && (
+            {/* An empty graph means the live feed failed. Say so — never dress up
+                placeholder numbers as if they were today's market. */}
+            {data && data.nodes.length === 0 && (
+              <ErrorState message="Live graph unavailable — please try again shortly." />
+            )}
+            {data && data.nodes.length > 0 && (
               <GraphCanvas
-                data={data}
-                onSelect={setSelected}
-                selectedId={selected?.id ?? null}
+                nodes={data.nodes}
+                edges={data.edges}
+                selected={selected?.id ?? null}
+                onSelect={(id) =>
+                  setSelected(id ? data.nodes.find((n) => n.id === id) ?? null : null)
+                }
+                height={620}
               />
             )}
-            {data && <MetaBar meta={data.meta} nodes={data.nodes.length} edges={data.edges.length} />}
+            {data && data.nodes.length > 0 && (
+              <MetaBar meta={data.meta} nodes={data.nodes.length} edges={data.edges.length} />
+            )}
           </div>
 
           <aside className="tool-side">
-            {data && (
-              <Sidebar
-                data={data}
-                selected={selected}
-                onSelect={setSelected}
-              />
+            {data && data.nodes.length > 0 && (
+              <Sidebar data={data} selected={selected} onSelect={setSelected} />
             )}
           </aside>
         </div>
       </div>
-    </div>
-  );
-}
-
-/* ---------- Canvas ---------- */
-
-function GraphCanvas({
-  data,
-  onSelect,
-  selectedId,
-}: {
-  data: GraphPayload;
-  onSelect: (n: GraphNode | null) => void;
-  selectedId: string | null;
-}) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const hoverRef = useRef<string | null>(null);
-  const [, setFrame] = useState(0); // force re-render for cursor changes
-
-  const simRef = useRef<{
-    nodes: SimNode[];
-    byId: Map<string, SimNode>;
-    edges: GraphEdge[];
-    clusterCenters: Map<number, { x: number; y: number }>;
-  } | null>(null);
-
-  // Build simulation
-  useEffect(() => {
-    const clusterIds = Array.from(new Set(data.nodes.map((n) => n.cluster)));
-    const clusterCenters = new Map<number, { x: number; y: number }>();
-    const singleCluster = clusterIds.length <= 1;
-    const R = Math.min(CANVAS_W, CANVAS_H) * 0.32;
-    clusterIds.forEach((cid, i) => {
-      if (singleCluster) {
-        clusterCenters.set(cid, { x: CANVAS_W / 2, y: CANVAS_H / 2 });
-      } else {
-        const a = (i / clusterIds.length) * Math.PI * 2 - Math.PI / 2;
-        clusterCenters.set(cid, {
-          x: CANVAS_W / 2 + Math.cos(a) * R,
-          y: CANVAS_H / 2 + Math.sin(a) * R,
-        });
-      }
-    });
-
-    // Spread initial positions across full canvas when single cluster
-    const spread = singleCluster ? Math.min(CANVAS_W, CANVAS_H) * 0.38 : 20;
-    const nodes: SimNode[] = data.nodes.map((n, i) => {
-      const c = clusterCenters.get(n.cluster)!;
-      const theta = (i / data.nodes.length) * Math.PI * 2;
-      return {
-        ...n,
-        x: c.x + Math.cos(theta) * spread + (Math.random() - 0.5) * 10,
-        y: c.y + Math.sin(theta) * spread + (Math.random() - 0.5) * 10,
-        vx: 0,
-        vy: 0,
-        r: 4 + n.centrality * 14,
-      };
-    });
-    const byId = new Map(nodes.map((n) => [n.id, n]));
-
-    simRef.current = { nodes, byId, edges: data.edges, clusterCenters };
-  }, [data]);
-
-  // Draw + simulate loop
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const resize = () => {
-      const r = canvas.getBoundingClientRect();
-      canvas.width = r.width * dpr;
-      canvas.height = r.height * dpr;
-      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    };
-    resize();
-    const ro = new ResizeObserver(resize);
-    ro.observe(canvas);
-
-    let raf = 0;
-    let t = 0;
-    const step = () => {
-      const sim = simRef.current;
-      if (!sim) {
-        raf = requestAnimationFrame(step);
-        return;
-      }
-      t += 1;
-      const rect = canvas.getBoundingClientRect();
-      const W = rect.width;
-      const H = rect.height;
-      const sx = W / CANVAS_W;
-      const sy = H / CANVAS_H;
-
-      // --- simulate ---
-      const { nodes, byId, edges, clusterCenters } = sim;
-      // repulsion (limit pairs for perf)
-      for (let i = 0; i < nodes.length; i++) {
-        const a = nodes[i];
-        for (let j = i + 1; j < nodes.length; j++) {
-          const b = nodes[j];
-          let dx = a.x - b.x;
-          let dy = a.y - b.y;
-          let d2 = dx * dx + dy * dy;
-          if (d2 < 1) d2 = 1;
-          if (d2 > 90000) continue;
-          const f = REPEL / d2;
-          const d = Math.sqrt(d2);
-          dx /= d;
-          dy /= d;
-          a.vx += dx * f * 0.018;
-          a.vy += dy * f * 0.018;
-          b.vx -= dx * f * 0.018;
-          b.vy -= dy * f * 0.018;
-        }
-      }
-      // edge springs
-      for (const e of edges) {
-        const a = byId.get(e.source);
-        const b = byId.get(e.target);
-        if (!a || !b) continue;
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const d = Math.max(Math.sqrt(dx * dx + dy * dy), 0.01);
-        const diff = d - SPRING_REST;
-        const f = SPRING * diff * e.weight;
-        const nx = dx / d;
-        const ny = dy / d;
-        a.vx += nx * f;
-        a.vy += ny * f;
-        b.vx -= nx * f;
-        b.vy -= ny * f;
-      }
-      // cluster pull + center + damping
-      for (const n of nodes) {
-        const c = clusterCenters.get(n.cluster)!;
-        n.vx += (c.x - n.x) * CLUSTER_PULL;
-        n.vy += (c.y - n.y) * CLUSTER_PULL;
-        n.vx += (CANVAS_W / 2 - n.x) * CENTER_PULL;
-        n.vy += (CANVAS_H / 2 - n.y) * CENTER_PULL;
-        n.vx *= DAMPING;
-        n.vy *= DAMPING;
-        n.x += n.vx;
-        n.y += n.vy;
-        // clamp
-        const m = 20;
-        if (n.x < m) n.x = m;
-        if (n.x > CANVAS_W - m) n.x = CANVAS_W - m;
-        if (n.y < m) n.y = m;
-        if (n.y > CANVAS_H - m) n.y = CANVAS_H - m;
-      }
-
-      // --- draw ---
-      ctx.clearRect(0, 0, W, H);
-
-      // subtle grid
-      ctx.strokeStyle = "rgba(36,46,71,0.3)";
-      ctx.lineWidth = 1;
-      const gridGap = 40;
-      ctx.beginPath();
-      for (let x = 0; x < W; x += gridGap) {
-        ctx.moveTo(x + 0.5, 0);
-        ctx.lineTo(x + 0.5, H);
-      }
-      for (let y = 0; y < H; y += gridGap) {
-        ctx.moveTo(0, y + 0.5);
-        ctx.lineTo(W, y + 0.5);
-      }
-      ctx.stroke();
-
-      // edges
-      for (const e of edges) {
-        const a = byId.get(e.source);
-        const b = byId.get(e.target);
-        if (!a || !b) continue;
-        const sameCluster = a.cluster === b.cluster;
-        const isActive =
-          selectedId && (a.id === selectedId || b.id === selectedId);
-        const hovered =
-          hoverRef.current &&
-          (a.id === hoverRef.current || b.id === hoverRef.current);
-        const alpha = isActive ? 0.7 : hovered ? 0.45 : sameCluster ? 0.18 : 0.07;
-        ctx.strokeStyle = sameCluster
-          ? `${a.clusterColor ?? "#7dd3fc"}`
-          : "#475569";
-        ctx.globalAlpha = alpha;
-        ctx.lineWidth = isActive ? 1.4 : 0.6;
-        ctx.beginPath();
-        ctx.moveTo(a.x * sx, a.y * sy);
-        ctx.lineTo(b.x * sx, b.y * sy);
-        ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
-
-      // nodes
-      for (const n of nodes) {
-        const isSel = selectedId === n.id;
-        const isHov = hoverRef.current === n.id;
-        const rr = n.r * (isSel ? 1.35 : isHov ? 1.15 : 1);
-        const cx = n.x * sx;
-        const cy = n.y * sy;
-        // glow
-        const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, rr * 2.6);
-        grad.addColorStop(0, (n.clusterColor ?? "#7dd3fc") + "aa");
-        grad.addColorStop(1, (n.clusterColor ?? "#7dd3fc") + "00");
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(cx, cy, rr * 2.6, 0, Math.PI * 2);
-        ctx.fill();
-        // core
-        ctx.fillStyle = n.clusterColor ?? "#7dd3fc";
-        ctx.beginPath();
-        ctx.arc(cx, cy, rr, 0, Math.PI * 2);
-        ctx.fill();
-        // outline for high-centrality / selection
-        if (n.centrality > 0.7 || isSel) {
-          ctx.strokeStyle = isSel ? "#ffffff" : "rgba(230,236,245,0.6)";
-          ctx.lineWidth = isSel ? 2 : 1;
-          ctx.stroke();
-        }
-        // label for important nodes
-        if (n.centrality > 0.6 || isSel || isHov) {
-          ctx.fillStyle = isSel ? "#ffffff" : "#b7c0d3";
-          ctx.font = `${
-            isSel ? 12 : 11
-          }px "IBM Plex Mono", ui-monospace, monospace`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "top";
-          ctx.fillText(n.symbol, cx, cy + rr + 6);
-        }
-      }
-
-      raf = requestAnimationFrame(step);
-    };
-
-    raf = requestAnimationFrame(step);
-    return () => {
-      cancelAnimationFrame(raf);
-      ro.disconnect();
-    };
-  }, [selectedId]);
-
-  // hit-testing / interaction
-  const onMove = (ev: React.MouseEvent<HTMLCanvasElement>) => {
-    const sim = simRef.current;
-    if (!sim) return;
-    const canvas = canvasRef.current!;
-    const rect = canvas.getBoundingClientRect();
-    const W = rect.width;
-    const H = rect.height;
-    const sx = W / CANVAS_W;
-    const sy = H / CANVAS_H;
-    const mx = ev.clientX - rect.left;
-    const my = ev.clientY - rect.top;
-    let found: string | null = null;
-    for (let i = sim.nodes.length - 1; i >= 0; i--) {
-      const n = sim.nodes[i];
-      const dx = mx - n.x * sx;
-      const dy = my - n.y * sy;
-      const rr = n.r * 1.4;
-      if (dx * dx + dy * dy < rr * rr) {
-        found = n.id;
-        break;
-      }
-    }
-    if (found !== hoverRef.current) {
-      hoverRef.current = found;
-      canvas.style.cursor = found ? "pointer" : "default";
-      setFrame((f) => f + 1);
-    }
-  };
-
-  const onClick = (ev: React.MouseEvent<HTMLCanvasElement>) => {
-    const sim = simRef.current;
-    if (!sim) return;
-    const canvas = canvasRef.current!;
-    const rect = canvas.getBoundingClientRect();
-    const W = rect.width;
-    const H = rect.height;
-    const sx = W / CANVAS_W;
-    const sy = H / CANVAS_H;
-    const mx = ev.clientX - rect.left;
-    const my = ev.clientY - rect.top;
-    for (let i = sim.nodes.length - 1; i >= 0; i--) {
-      const n = sim.nodes[i];
-      const dx = mx - n.x * sx;
-      const dy = my - n.y * sy;
-      const rr = n.r * 1.4;
-      if (dx * dx + dy * dy < rr * rr) {
-        onSelect(n);
-        return;
-      }
-    }
-    onSelect(null);
-  };
-
-  return (
-    <div className="tool-canvas-box">
-      <canvas
-        ref={canvasRef}
-        className="tool-canvas"
-        onMouseMove={onMove}
-        onClick={onClick}
-        onMouseLeave={() => {
-          hoverRef.current = null;
-          if (canvasRef.current) canvasRef.current.style.cursor = "default";
-        }}
-      />
     </div>
   );
 }
@@ -680,10 +358,17 @@ function MetaBar({
       <span style={{ color: "var(--accent-2)" }}>
         {meta.modularity?.toFixed(3) ?? "—"}
       </span>
+      {meta.asOf && (
+        <>
+          <span className="dim">·</span>
+          <span className="dim">AS OF</span>
+          <span>{meta.asOf.slice(0, 10)}</span>
+        </>
+      )}
       {meta.fallback && (
         <>
           <span className="dim">·</span>
-          <span style={{ color: "var(--warn)" }}>SAMPLE_DATA</span>
+          <span style={{ color: "var(--warn)" }}>LIVE FEED DOWN</span>
         </>
       )}
     </div>

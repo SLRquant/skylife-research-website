@@ -51,7 +51,7 @@ export function Pricing() {
               </li>
               <li>
                 <Check />
-                NIFTY500 coverage
+                NIFTY-50 coverage
               </li>
               <li>
                 <Check />
@@ -115,7 +115,7 @@ export function Pricing() {
               </li>
               <li>
                 <Check />
-                Custom universe beyond NIFTY500
+                Custom universe beyond NIFTY-50
               </li>
               <li>
                 <Check />

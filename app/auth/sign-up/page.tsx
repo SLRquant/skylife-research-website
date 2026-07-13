@@ -6,9 +6,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useState } from "react";
-import { getFirebaseAuth, isFirebaseConfigured } from "@/lib/firebase/client";
+import {
+  getFirebaseAuth,
+  isFirebaseConfigured,
+  signInWithGoogle,
+} from "@/lib/firebase/client";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { Navbar } from "@/components/Navbar";
+import { GoogleButton } from "@/components/GoogleButton";
 
 const schema = z.object({
   email: z.email("Enter a valid email"),
@@ -52,6 +57,17 @@ export default function SignUpPage() {
         <div className="auth-card">
           <h1>Create account</h1>
           <p className="sub">Seven-day trial. No credit card.</p>
+
+          <GoogleButton
+            label="Sign up with Google"
+            onClick={async () => {
+              await signInWithGoogle();
+              router.replace("/dashboard");
+            }}
+            onError={setErr}
+          />
+          <div className="auth-divider"><span>or</span></div>
+
           <form
             className="contact-form"
             onSubmit={handleSubmit(onSubmit)}

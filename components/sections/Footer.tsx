@@ -117,17 +117,16 @@ export function Footer() {
           </div>
           <div className="foot-col">
             <h5>Platform</h5>
-            <Link href="#platform">Portfolio Analyzer</Link>
-            <Link href="#platform">Network Graph</Link>
-            <Link href="#platform">Momentum Stocks</Link>
+            {/* Only link to doors that actually open. */}
+            <Link href="/dashboard/graph-stats">Graph Stats</Link>
+            <Link href="/network-graph">Network Graph</Link>
+            <Link href="/dashboard">Dashboard</Link>
             <Link href="#pricing">Pricing</Link>
-            <a href="#">API Docs</a>
           </div>
           <div className="foot-col">
             <h5>Company</h5>
-            <a href="#">About Us</a>
             <Link href="#methodology">Methodology</Link>
-            <a href="#">Research Notes</a>
+            <Link href="#faq">FAQ</Link>
             <Link href="#contact">Contact</Link>
           </div>
           <div className="foot-col">

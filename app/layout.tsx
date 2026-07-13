@@ -25,11 +25,11 @@ const plexMono = IBM_Plex_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Skylife Research — Trade the Hidden Network",
+  title: "Skylife Research — The market isn't a list. It's a network.",
   description:
-    "Daily community-detection signals on NIFTY500 — powered by graph theory and eigenvector centrality. Delivered as a feed, dashboard, or API.",
+    "Per-stock network centrality on the NIFTY-50, rebuilt every session. Track who is becoming a hub and who is drifting to the edge — with the graph engine you run yourself.",
   openGraph: {
-    title: "Skylife Research — Trade the Hidden Network",
+    title: "Skylife Research — The market isn't a list. It's a network.",
     description:
       "Graph-theory-powered quantitative research for the Indian stock market.",
     type: "website",

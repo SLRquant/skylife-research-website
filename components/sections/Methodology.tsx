@@ -1,77 +1,120 @@
+"use client";
+
+import { motion } from "framer-motion";
+import { usePulse } from "@/lib/usePulse";
+import { CountUp } from "@/components/CountUp";
+
+const EASE = [0.16, 1, 0.3, 1] as const;
+
+/**
+ * How the engine actually works — every claim here is something the code does.
+ * (The previous copy advertised a NIFTY-500 universe, 2018 history, and intraday
+ * cluster-breakdown alerts. None of those exist.)
+ */
+const STEPS = [
+  {
+    n: "01",
+    tag: "RETURNS",
+    title: "Log returns, session-aligned",
+    body:
+      "Every stock's OHLCV is resampled from 1-minute bars to your interval, then converted to log returns over a trailing window you choose — 60 bars by default.",
+    metric: ["Intervals", "1m → 1w"],
+  },
+  {
+    n: "02",
+    tag: "GRAPH",
+    title: "Correlation becomes structure",
+    body:
+      "Pearson (or Spearman) correlation across the window gives a dense matrix. We sparsify it into a graph — a Mantegna minimum spanning tree by default, or kNN, threshold, or complete.",
+    metric: ["Methods", "MST · kNN · θ"],
+  },
+  {
+    n: "03",
+    tag: "CENTRALITY",
+    title: "Where each stock sits",
+    body:
+      "Louvain finds the communities; five centrality measures score each stock's position — eigenvector, PageRank, degree strength, betweenness, closeness. Rebuilt per as-of day, so you see it move.",
+    metric: ["Metrics", "5 per stock"],
+  },
+];
+
 export function Methodology() {
+  const { pulse } = usePulse();
+
   return (
     <section id="methodology" className="section">
       <div className="wrap">
-        <div className="sec-head">
+        <motion.div
+          className="sec-head"
+          initial={{ opacity: 0, y: 16 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.4 }}
+          transition={{ duration: 0.6, ease: EASE }}
+        >
           <div>
-            <div className="sec-eyebrow">◉ Methodology</div>
+            <div className="sec-eyebrow mono">◉ HOW IT WORKS</div>
             <h2 className="sec-title">
-              Three capabilities, <em>three outputs.</em>
+              Prices in. <em>Structure out.</em>
             </h2>
           </div>
           <p className="sec-desc">
-            Most quant signals stop at the stock. Ours start at the{" "}
-            <span className="em-strong">edges</span> between them.
+            Most signals stop at the stock. Ours start at the{" "}
+            <span className="em-strong">edges</span> between them — and no step is a black box.
           </p>
-        </div>
-        <div className="caps">
-          <div className="cap">
-            <div className="cap-tag">◎ 01 · COMMUNITY DETECTION</div>
-            <h4>
-              Louvain modularity on 30-day returns surfaces today&apos;s cohesive
-              clusters — the stocks actually moving together, not just the ones
-              in the same NSE sector bucket.
-            </h4>
-            <div className="cap-metric">
-              <span>Rolling window</span>
-              <b>30 days</b>
-            </div>
-          </div>
-          <div className="cap">
-            <div className="cap-tag">◉ 02 · EIGENVECTOR CENTRALITY</div>
-            <h4>
-              Rank every stock inside its cluster by centrality to find the
-              mover — the one whose price action the rest of the cluster tends
-              to follow.
-            </h4>
-            <div className="cap-metric">
-              <span>Per-cluster leaders</span>
-              <b>Top 5 ranked</b>
-            </div>
-          </div>
-          <div className="cap">
-            <div className="cap-tag">◈ 03 · PORTFOLIO CONCENTRATION</div>
-            <h4>
-              Measure your book&apos;s single-node dependence via graph
-              centrality — not just sector-tag overlap. Find the position that,
-              if it breaks, drags the rest with it.
-            </h4>
-            <div className="cap-metric">
-              <span>Exposure surface</span>
-              <b>Centrality-weighted</b>
-            </div>
-          </div>
+        </motion.div>
+
+        <div className="steps">
+          {STEPS.map((s, i) => (
+            <motion.div
+              key={s.n}
+              className="step"
+              initial={{ opacity: 0, y: 22 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.3 }}
+              transition={{ duration: 0.55, ease: EASE, delay: i * 0.08 }}
+            >
+              <div className="step-rail">
+                <span className="step-n mono">{s.n}</span>
+                {i < STEPS.length - 1 && <span className="step-line" />}
+              </div>
+              <div className="step-body">
+                <div className="step-tag mono">{s.tag}</div>
+                <h3>{s.title}</h3>
+                <p>{s.body}</p>
+                <div className="step-metric">
+                  <span className="mono dim">{s.metric[0]}</span>
+                  <b className="mono">{s.metric[1]}</b>
+                </div>
+              </div>
+            </motion.div>
+          ))}
         </div>
 
-        <div className="coverage">
+        <motion.div
+          className="coverage"
+          initial={{ opacity: 0, y: 18 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, amount: 0.3 }}
+          transition={{ duration: 0.6, ease: EASE }}
+        >
           <div className="cov">
-            <div className="cov-label">Coverage</div>
-            <div className="cov-val">NIFTY 500</div>
+            <div className="cov-label mono">COVERAGE</div>
+            <div className="cov-val">NIFTY 50</div>
             <div className="cov-sub">
-              Large, mid, and small cap — rebalanced daily
+              <CountUp value={pulse?.stocks} /> tradable names · NSE
             </div>
           </div>
           <div className="cov">
-            <div className="cov-label">Refresh</div>
-            <div className="cov-val">Daily · 08:00</div>
-            <div className="cov-sub">Pre-market graph refresh, IST</div>
+            <div className="cov-label mono">GRANULARITY</div>
+            <div className="cov-val">1-minute</div>
+            <div className="cov-sub">Resampled to any interval, 1m → 1w</div>
           </div>
           <div className="cov">
-            <div className="cov-label">Exchanges</div>
-            <div className="cov-val">NSE / BSE</div>
-            <div className="cov-sub">Equity cash · FAO</div>
+            <div className="cov-label mono">HISTORY</div>
+            <div className="cov-val">2025 →</div>
+            <div className="cov-sub">Rebuilt every session, not backfilled</div>
           </div>
-        </div>
+        </motion.div>
       </div>
     </section>
   );
