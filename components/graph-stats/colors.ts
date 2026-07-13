@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+
 /**
  * THE INKS.
  *
@@ -41,17 +43,26 @@ const CLUSTER_PAPER = ["#a2143c", "#7b7415", "#209c6b", "#1e8dcd", "#6d47f5", "#
  * Used for the ≤8 highlighted STOCKS in the time-series chart. This is the palette that fixes
  * DEFECT 1: colour now encodes the stock the user is tracking, not its cluster.
  *
- * Direct-labelled at the line end AND dash-coded (see seriesDash), so the validator's documented
- * 8–12 ΔE floor band is legitimately available here — a secondary encoding is present. Cluster
- * inks get no such relief, which is why that set is held to the stricter ΔE ≥ 12.
+ * These two sets do NOT share a hue skeleton, and that is a measured result, not laziness: a
+ * shared-hue 8-slot solution passing on BOTH surfaces does not exist. (Searched; returns nothing.)
+ * Direction B requires the light palette to be SELECTED rather than inherited anyway, so each mode
+ * got its own hues and its own lightness profile.
+ *
+ *   node scripts/validate_palette.js "<ink set>"   --mode dark  --surface "#0b0f19" --pairs all
+ *     [PASS] band · [PASS] chroma · [PASS] CVD ΔE 20.0 · [PASS] contrast (min 3.04:1)
+ *   node scripts/validate_palette.js "<paper set>" --mode light --surface "#f4f1ea" --pairs all
+ *     [PASS] band · [PASS] chroma · [PASS] CVD ΔE 25.0 · [PASS] contrast (min 3.09:1)
+ *
+ * Both clear the ΔE >= 12 TARGET outright, so we are not even leaning on the 8–12 floor band that
+ * the direct end-labels and dash patterns would have entitled us to. Belt, braces, and a spare.
  */
 const SERIES_INK = [
-  "#e4572e", "#d9a521", "#8fae1b", "#1fa95f",
-  "#20a4a4", "#3d8ce6", "#9b6ef3", "#e0479e",
+  "#974b10", "#24aa5f", "#157546", "#009290",
+  "#13689f", "#b021e0", "#f129d9", "#d96d1d",
 ];
 const SERIES_PAPER = [
-  "#bc3d17", "#96700b", "#6c8412", "#12854a",
-  "#0e8383", "#2f6fc4", "#7b48d8", "#c02a80",
+  "#f029d9", "#a5141f", "#c2761c", "#1f9855",
+  "#008a79", "#00608c", "#2f1ff3", "#7a17b7",
 ];
 
 /**
@@ -71,6 +82,24 @@ export function hatchAngle(community?: number | null): number {
   if (!community || community < 1) return 0;
   const cycle = Math.floor((community - 1) / 6);
   return [45, 135, 0, 90][cycle % 4];
+}
+
+/**
+ * A community swatch, carrying BOTH channels.
+ *
+ * This exists because a plain colour square is a bug. With 8 live communities and only 6 inks
+ * that pass the validator, C2 and C8 share a hue — on the plate they are still trivially
+ * distinguishable because their HATCH ANGLES differ, but a flat square throws that away and the
+ * two read as identical. The secondary encoding has to travel with the colour EVERYWHERE it is
+ * shown, or it isn't an encoding, it's a decoration.
+ */
+export function clusterSwatch(community?: number | null): CSSProperties {
+  const ink = clusterInk(community);
+  return {
+    border: `1px solid ${ink}`,
+    backgroundColor: "transparent",
+    backgroundImage: `repeating-linear-gradient(${hatchAngle(community)}deg, ${ink} 0 1.5px, transparent 1.5px 4px)`,
+  };
 }
 
 /** Ink for the i-th highlighted stock (i < 8). Stable for a given sorted symbol set. */

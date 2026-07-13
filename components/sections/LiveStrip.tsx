@@ -1,7 +1,7 @@
 "use client";
 
 import { usePulse } from "@/lib/usePulse";
-import { clusterInk } from "@/components/graph-stats/colors";
+import { clusterSwatch } from "@/components/graph-stats/colors";
 
 /**
  * Table 1 — the readout. Real numbers from /api/public/pulse, set as a data table.
@@ -49,7 +49,7 @@ export function LiveStrip() {
                 <span key={l.symbol} className="readout-leader">
                   <span
                     className="swatch"
-                    style={{ background: clusterInk(l.community ?? 0) }}
+                    style={clusterSwatch(l.community ?? 0)}
                     aria-hidden="true"
                   />
                   {l.symbol}

@@ -281,7 +281,17 @@ em { font-style: italic; }
 
 /* ---- form fields ---- */
 .field { display: grid; gap: var(--space-1); align-content: start; }
-.field > .label { white-space: nowrap; }
+/* The field's own <label> text IS a micro-label — it must not fall back to the serif body face.
+   :first-child, not :first-of-type: .hint and .err are also spans in this slot. */
+.field > .label,
+.field > span:first-child {
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
 .field input, .field select, .field textarea {
   background: var(--plate);
   border: 1px solid var(--rule-2);
@@ -457,7 +467,7 @@ em { font-style: italic; }
   font-size: var(--text-xs);
 }
 .readout-leader em { margin-left: auto; font-style: normal; color: var(--ink-3); }
-.swatch { width: 8px; height: 8px; flex: none; border: 1px solid var(--rule-2); }
+.swatch { width: 11px; height: 11px; flex: none; border: 1px solid var(--rule-2); }
 
 /* ══════════════════════════════ THE GRAPH ══════════════════════════════ */
 
@@ -987,6 +997,20 @@ a.tool:hover { background: var(--paper-2); }
   .readout-cell { border-right: 0; border-bottom: 1px solid var(--rule); }
   .colophon-grid { grid-template-columns: 1fr; }
   .title { max-width: none; }
+
+  /* The masthead is brand + toggle + sign-in. At 375 that is ~30px too wide, so the
+     publication's strapline stands down — the toggle does not, because it is the feature. */
+  .brand { font-size: var(--text-md); }
+  .brand .sub { display: none; }
+  .masthead-inner { gap: var(--space-2); }
+  .masthead-right { gap: var(--space-2); }
+  .theme-toggle { padding: var(--space-1); letter-spacing: .04em; }
+  .theme-glyph { margin-right: 0; }
+  .btn { padding: var(--space-2); }
+
+  .fig-head { gap: var(--space-1); }
+  .scrub { flex-wrap: wrap; gap: var(--space-2); }
+  .legend { gap: var(--space-2); }
 }
 
 /* ══════════════════════════════ PRINT ══════════════════════════════

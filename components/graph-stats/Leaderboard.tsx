@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Series } from "@/lib/graph-stats";
-import { clusterInk } from "./colors";
+import { clusterInk, clusterSwatch } from "./colors";
 
 type Row = {
   symbol: string;
@@ -171,7 +171,7 @@ export function Leaderboard({
                 <td className="dim">{r.rank}</td>
                 <td>
                   <span className="cell-key">
-                    <span className="swatch" style={{ background: ink }} />
+                    <span className="swatch" style={clusterSwatch(r.community ?? 0)} />
                     <span className="sym">{r.symbol}</span>
                   </span>
                 </td>

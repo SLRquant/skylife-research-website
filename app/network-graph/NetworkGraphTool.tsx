@@ -5,7 +5,7 @@ import useSWR from "swr";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { PlotterGraph, type PFrame } from "@/components/PlotterGraph";
-import { clusterInk, hatchAngle } from "@/components/graph-stats/colors";
+import { clusterInk, clusterSwatch, hatchAngle } from "@/components/graph-stats/colors";
 
 type Payload = {
   universe: string;
@@ -162,7 +162,7 @@ export function NetworkGraphTool() {
                   {clusters.map((c) => (
                     <div className="cluster-row" key={c.id}>
                       <div className="cluster-top">
-                        <span className="swatch" style={{ background: clusterInk(c.id) }} />
+                        <span className="swatch" style={clusterSwatch(c.id)} />
                         <span className="cluster-name">C{c.id}</span>
                         <span className="cluster-n">{c.members.length} stocks</span>
                       </div>
@@ -192,7 +192,7 @@ export function NetworkGraphTool() {
                   </button>
                   <div className="side-head" style={{ marginTop: "var(--space-2)" }}>
                     <span className="cluster-name">{node.id}</span>
-                    <span className="swatch" style={{ background: clusterInk(node.community) }} />
+                    <span className="swatch" style={clusterSwatch(node.community)} />
                   </div>
                   <div className="stat-grid">
                     <div className="stat">
@@ -227,7 +227,7 @@ export function NetworkGraphTool() {
                       onClick={() => setSelected(n.id)}
                     >
                       <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        <span className="swatch" style={{ background: clusterInk(n.community) }} />
+                        <span className="swatch" style={clusterSwatch(n.community)} />
                         {n.id}
                       </span>
                       <b>{n.rho.toFixed(3)}</b>

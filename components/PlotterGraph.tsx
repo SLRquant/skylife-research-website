@@ -76,7 +76,12 @@ const REHEAT = 0.15;      // FOUNDATION §8.1 — relax into the new structure, 
 const DECAY_MORPH = 0.06; // ~40 ticks
 const DECAY_COLD = 0.022; // first layout gets longer to find itself
 const HOP_MS = 70;        // hop-by-hop hover trace cadence
-const DITHER_LEVELS = 4.0;
+
+/* The screen. 3 levels + a 2px cell is what makes it read as a PRINTED halftone rather than as
+   an anti-aliased vector: at 4 levels / 1px cell the Bayer pattern is below the eye's pitch and
+   the whole point is lost. */
+const DITHER_LEVELS = 3.0;
+const DITHER_CELL = 2;
 
 const reducedMotion = () =>
   typeof window !== "undefined" &&
@@ -278,6 +283,7 @@ export function PlotterGraph({
 
   const view = useRef({ k: 1, tx: 0, ty: 0, init: false });
   const userView = useRef(false); // once the user pans/zooms, stop auto-fitting
+  const viewSettled = useRef(true); // has the eased transform ARRIVED at the content bbox?
   const drag = useRef<{ node: PNode | null; pan: boolean; x: number; y: number; moved: number }>({
     node: null, pan: false, x: 0, y: 0, moved: 0,
   });
@@ -376,6 +382,14 @@ export function PlotterGraph({
         v.tx += (target.tx - v.tx) * e;
         v.ty += (target.ty - v.ty) * e;
         v.init = true;
+        // The loop must not cool while the transform is still mid-ease, or the view freezes
+        // part-way and the graph sits cropped. The rAF keeps going until this is true.
+        viewSettled.current =
+          Math.abs(target.k - v.k) < 1e-3 &&
+          Math.abs(target.tx - v.tx) < 0.5 &&
+          Math.abs(target.ty - v.ty) < 0.5;
+      } else {
+        viewSettled.current = true;
       }
     }
     const { k, tx, ty } = view.current;
@@ -406,8 +420,10 @@ export function PlotterGraph({
     for (const [c, members] of byComm) {
       if (members.length < 3) continue;
       const coh = coherence.get(c) ?? 0.5;
-      // padding is DATA: a loose community swells, a tightening one contracts
-      const pad = 12 + (1 - coh) * 30;
+      // padding is DATA: a loose community swells, a tightening one contracts.
+      // Kept tight — a fat hull on a sprawling MST swallows its neighbours and the plate turns
+      // to mush. The SWELL is the signal, so it has to be readable against a quiet baseline.
+      const pad = 6 + (1 - coh) * 16;
       const pts = inflate(convexHull(members.map((n) => [X(n.x!), Y(n.y!)] as [number, number])), pad);
       if (pts.length < 3) continue;
       const path = hullPath(pts);
@@ -490,7 +506,7 @@ export function PlotterGraph({
     /* ============ SCREEN the plate ============ */
     const gl = glRef.current;
     if (dither && gl && ditherRef.current) {
-      ditherRef.current.draw(plate, Math.max(1, Math.round(dpr)));
+      ditherRef.current.draw(plate, Math.max(1, Math.round(dpr)) * DITHER_CELL);
     }
 
     /* ============ OVERLAY — type. Never dithered. ============ */
@@ -568,7 +584,8 @@ export function PlotterGraph({
       // the view eases onto the content bbox, so keep drawing until it has arrived too
       draw();
 
-      if ((moving || animatingHops || drag.current.node) && visibleRef.current) {
+      const keepGoing = moving || animatingHops || !!drag.current.node || !viewSettled.current;
+      if (keepGoing && visibleRef.current) {
         rafRef.current = requestAnimationFrame(loop);
       } else {
         runningRef.current = false; // COOL. The element becomes stable; Playwright can shoot it.
@@ -630,6 +647,35 @@ export function PlotterGraph({
     }
     adjRef.current = adj;
 
+    /**
+     * Community cohesion — pull each node gently toward its own community's centroid.
+     *
+     * Without this the MST sprawls and the Louvain partition, which is REAL data, is spatially
+     * meaningless: the hulls all overlap into mush and you cannot see a community at all. This
+     * force does not invent structure — it renders structure the engine already found, the same
+     * way a coloured node does. It is deliberately weak (0.04) so tree topology still dominates
+     * the layout and a stock genuinely between two communities still sits between them.
+     */
+    const cohere = () => {
+      let ns: PNode[] = [];
+      const f = (alpha: number) => {
+        const cen = new Map<number, { x: number; y: number; n: number }>();
+        for (const n of ns) {
+          const c = cen.get(n.community) ?? { x: 0, y: 0, n: 0 };
+          c.x += n.x!; c.y += n.y!; c.n++;
+          cen.set(n.community, c);
+        }
+        for (const n of ns) {
+          const c = cen.get(n.community)!;
+          const k = 0.03 * alpha;
+          n.vx! += (c.x / c.n - n.x!) * k;
+          n.vy! += (c.y / c.n - n.y!) * k;
+        }
+      };
+      f.initialize = (_: PNode[]) => { ns = _; };
+      return f;
+    };
+
     /** the anchor force — the heart of the morph */
     const anchor = () => {
       let ns: PNode[] = [];
@@ -652,13 +698,18 @@ export function PlotterGraph({
         forceLink<PNode, PLink>(links)
           .id((d) => d.id)
           // strong correlation => SHORT edge. The geometry means something.
-          .distance((l) => 30 + 90 * (1 - Math.abs(l.rho)))
-          .strength((l) => Math.abs(l.rho))
+          .distance((l) => 50 + 110 * (1 - Math.abs(l.rho)))
+        // NOTE: link STRENGTH is left at d3's default (1 / min(deg(source), deg(target))), which
+        // is tuned for exactly this case — it stops a high-degree hub from being torn apart by its
+        // own spokes. Overriding it with |rho| (~0.6–0.9 on every MST edge) made every spring
+        // equally stiff and collapsed the tree into a hairball. The correlation still drives the
+        // geometry, through DISTANCE, which is where it belongs.
       )
-      .force("charge", forceManyBody<PNode>().strength(-190).distanceMax(520))
-      .force("collide", forceCollide<PNode>((d) => d.r + 4))
-      .force("x", forceX<PNode>(cx).strength(0.02))
-      .force("y", forceY<PNode>(cy).strength(0.02))
+      .force("charge", forceManyBody<PNode>().strength(-520).distanceMax(900))
+      .force("collide", forceCollide<PNode>((d) => d.r + 7).strength(0.9))
+      .force("x", forceX<PNode>(cx).strength(0.015))
+      .force("y", forceY<PNode>(cy).strength(0.04)) // squash y a little: the plate is 16:9, not square
+      .force("cohere", cohere())
       .force("anchor", anchor())
       .alphaMin(ALPHA_MIN)
       .stop(); // WE drive the ticks — d3's internal timer would never let the page go idle
@@ -670,14 +721,20 @@ export function PlotterGraph({
     nodesRef.current = nodes;
     linksRef.current = links;
 
-    if (reducedMotion()) {
-      // No positional motion at all: solve to convergence, then paint ONE frame.
-      for (let i = 0; i < 400 && sim.alpha() > ALPHA_MIN; i++) sim.tick();
+    // The FIRST layout is solved synchronously and opens already settled. Two reasons:
+    //   · the figure is below the fold, so the IntersectionObserver (correctly) parks the rAF
+    //     loop — without a warm-up the plate would be caught mid-expansion, cropped, whenever a
+    //     reader scrolled to it, and a screenshot would catch it there too;
+    //   · a settled opening frame is the honest one. The motion we want the eye to spend itself
+    //     on is the MORPH, not the birth.
+    // A morph, by contrast, IS animated — that is the entire product.
+    if (!isMorph || reducedMotion()) {
+      for (let k = 0; k < 400 && sim.alpha() > ALPHA_MIN; k++) sim.tick();
       for (const n of nodes) {
         n.drift = n.ax != null ? Math.hypot(n.x! - n.ax, n.y! - n.ay!) : 0;
       }
       userView.current = false;
-      view.current.init = false;
+      view.current.init = false; // snap the fit; there is nothing to ease from
       draw();
       return;
     }
