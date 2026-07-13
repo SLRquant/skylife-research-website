@@ -1,87 +1,67 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { CountUp } from "@/components/CountUp";
 import { usePulse } from "@/lib/usePulse";
-import { clusterColor } from "@/components/graph-stats/colors";
-
-const EASE = [0.16, 1, 0.3, 1] as const;
+import { clusterInk } from "@/components/graph-stats/colors";
 
 /**
- * The headline numbers — all of them real, pulled from /api/public/pulse.
- * (These used to be hardcoded: "3 clusters", "0.452 modularity". They now reflect the
- * graph the engine actually built this session.)
+ * Table 1 — the readout. Real numbers from /api/public/pulse, set as a data table.
+ *
+ * No count-up-on-scroll. A number that animates from 0 to its value is, for the several hundred
+ * milliseconds in between, a WRONG NUMBER on screen. In a trading context that is a defect, not a
+ * delight. These print instantly, in mono, tabular.
  */
 export function LiveStrip() {
   const { pulse, isLoading } = usePulse();
-
-  const asOf = pulse?.asOf
-    ? new Date(pulse.asOf).toLocaleDateString("en-IN", {
-        day: "2-digit",
-        month: "short",
-        year: "numeric",
-      })
-    : null;
+  const dash = isLoading ? "…" : "—";
 
   return (
-    <section className="live-strip-wrap">
-      <div className="wrap">
-        <motion.div
-          className="live-strip"
-          initial={{ opacity: 0, y: 18 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.6, ease: EASE }}
-        >
-          <div className="live-cell">
-            <div className="live-label mono">UNIVERSE</div>
-            <div className="live-value">{pulse?.universe ?? "NIFTY 50"}</div>
-            <div className="live-delta mono">
-              <CountUp value={pulse?.stocks} /> tradable names
-            </div>
-          </div>
+    <section className="wrap">
+      <div className="readout">
+        <div className="readout-cell">
+          <div className="label">Universe</div>
+          <div className="readout-v">{pulse?.stocks ?? dash}</div>
+          <div className="readout-sub">tradable names · {pulse?.universe ?? "NIFTY 50"}</div>
+        </div>
 
-          <div className="live-cell">
-            <div className="live-label mono">CLUSTERS TODAY</div>
-            <div className="live-value">
-              <CountUp value={pulse?.communities} />
-            </div>
-            <div className="live-delta mono">Louvain · {asOf ?? "—"}</div>
-          </div>
+        <div className="readout-cell">
+          <div className="label">Communities</div>
+          <div className="readout-v">{pulse?.communities ?? dash}</div>
+          <div className="readout-sub">Louvain · {pulse?.edges ?? dash} edges ({pulse?.method ?? "mst"})</div>
+        </div>
 
-          <div className="live-cell">
-            <div className="live-label mono">MODULARITY</div>
-            <div className="live-value accent">
-              <CountUp value={pulse?.modularity} decimals={3} />
-            </div>
-            <div className="live-delta mono">
-              {/* Modularity has a meaning; say it instead of a vague "Optimized". */}
-              {pulse && (pulse.modularity ?? 0) > 0.5
+        <div className="readout-cell">
+          <div className="label">Modularity</div>
+          <div className="readout-v sig">{pulse?.modularity?.toFixed(3) ?? dash}</div>
+          <div className="readout-sub">
+            {pulse == null
+              ? " "
+              : (pulse.modularity ?? 0) > 0.5
                 ? "strong separation"
                 : "weak separation"}
-            </div>
           </div>
+        </div>
 
-          <div className="live-cell">
-            <div className="live-label mono">MOST CENTRAL</div>
-            <div className="live-leaders">
-              {pulse?.leaders?.length ? (
-                pulse.leaders.map((l) => (
-                  <span key={l.symbol} className="live-leader mono">
-                    <span
-                      className="live-leader-dot"
-                      style={{ background: clusterColor(l.community) }}
-                    />
-                    {l.symbol}
-                    <em>{l.centrality.toFixed(2)}</em>
-                  </span>
-                ))
-              ) : (
-                <span className="dim mono">{isLoading ? "computing…" : "—"}</span>
-              )}
-            </div>
+        <div className="readout-cell">
+          <div className="label">Most central</div>
+          <div className="readout-leaders">
+            {pulse?.leaders?.length ? (
+              pulse.leaders.map((l) => (
+                <span key={l.symbol} className="readout-leader">
+                  <span
+                    className="swatch"
+                    style={{ background: clusterInk(l.community ?? 0) }}
+                    aria-hidden="true"
+                  />
+                  {l.symbol}
+                  <em>{l.centrality.toFixed(3)}</em>
+                </span>
+              ))
+            ) : (
+              <span className="dim">{dash}</span>
+            )}
           </div>
-        </motion.div>
+          <div className="readout-sub">eigenvector centrality</div>
+        </div>
       </div>
     </section>
   );

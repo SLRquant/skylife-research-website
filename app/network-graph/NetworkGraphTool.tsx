@@ -1,397 +1,255 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import useSWR from "swr";
 import Link from "next/link";
-import { GraphCanvas } from "@/components/GraphCanvas";
+import { Navbar } from "@/components/Navbar";
+import { PlotterGraph, type PFrame } from "@/components/PlotterGraph";
+import { clusterInk, hatchAngle } from "@/components/graph-stats/colors";
 
-/* ---------- Types ---------- */
-
-type GraphNode = {
-  id: string;
-  symbol: string;
-  name?: string;
-  cluster: number;
-  clusterLabel?: string;
-  clusterColor?: string;
-  centrality: number;
-  momentum: number;
-  marketCap?: number;
+type Payload = {
+  universe: string;
+  method: string;
+  metric: string;
+  frames: PFrame[];
+  live: boolean;
 };
 
-type GraphEdge = {
-  source: string;
-  target: string;
-  weight: number;
-};
+const fetcher = (u: string) => fetch(u).then((r) => r.json());
 
-type GraphMeta = {
-  universe?: string;
-  method?: string;
-  lookbackDays?: number;
-  correlationThreshold?: number;
-  clustersDetected?: number;
-  modularity?: number;
-  asOf?: string;
-  fallback?: boolean;
-};
+const fmtDate = (iso: string | null) =>
+  iso ? new Date(iso).toLocaleDateString("en-IN", { year: "numeric", month: "short", day: "2-digit" }) : "—";
 
-type GraphPayload = {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
-  meta: GraphMeta;
-};
-
-/* ---------- Component ---------- */
-
+/**
+ * /network-graph — Fig. 2, full plate.
+ *
+ * Same real graph series as Fig. 1 (six genuinely recomputed MSTs, one per estimation window),
+ * given the whole page and a sidebar that reads out what the current frame actually contains.
+ */
 export function NetworkGraphTool() {
-  const [data, setData] = useState<GraphPayload | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<GraphNode | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading } = useSWR<Payload>("/api/public/graph-series", fetcher, {
+    revalidateOnFocus: false,
+    dedupingInterval: 600_000,
+  });
 
-  useEffect(() => {
-    let abort = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/network-graph", { cache: "no-store" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = (await res.json()) as Partial<GraphPayload>;
-        if (!json || !Array.isArray(json.nodes) || !Array.isArray(json.edges)) {
-          throw new Error("Malformed graph response");
-        }
-        if (!abort) {
-          setData({
-            nodes: json.nodes as GraphNode[],
-            edges: json.edges as GraphEdge[],
-            meta: (json.meta ?? {}) as GraphMeta,
-          });
-          setLoading(false);
-        }
-      } catch (e) {
-        if (!abort) {
-          setError(e instanceof Error ? e.message : "Failed to load");
-          setLoading(false);
-        }
-      }
-    })();
-    return () => {
-      abort = true;
-    };
-  }, []);
+  const frames = useMemo(() => data?.frames ?? [], [data]);
+  const [i, setI] = useState(2); // the 60-bar window — the engine's default
+  const [selected, setSelected] = useState<string | null>(null);
 
-  return (
-    <div className="tool-page">
-      <div className="wrap tool-wrap">
-        <header className="tool-header">
-          <div>
-            <div className="eyebrow" style={{ marginBottom: 8 }}>
-              <span className="eb-primary">● LIVE TOOL</span>
-              <span className="sep">/</span>
-              <span>NIFTY-50 correlation network</span>
-            </div>
-            <h1 className="tool-title">Network Graph</h1>
-            <p className="tool-sub">
-              The NIFTY-50 plotted by correlation structure. Clusters are detected via Louvain;
-              node size is eigenvector centrality; edge weight is |correlation| over the last 60
-              sessions.
-            </p>
-          </div>
-          <Link href="/" className="btn btn-ghost tool-back" aria-label="Back">
-            <span>← Back</span>
-          </Link>
-        </header>
+  const f = frames[Math.min(i, Math.max(frames.length - 1, 0))];
 
-        <div className="tool-layout">
-          <div className="tool-canvas-wrap">
-            {loading && <LoadingOverlay />}
-            {error && !data && <ErrorState message={error} />}
-            {/* An empty graph means the live feed failed. Say so — never dress up
-                placeholder numbers as if they were today's market. */}
-            {data && data.nodes.length === 0 && (
-              <ErrorState message="Live graph unavailable — please try again shortly." />
-            )}
-            {data && data.nodes.length > 0 && (
-              <GraphCanvas
-                nodes={data.nodes}
-                edges={data.edges}
-                selected={selected?.id ?? null}
-                onSelect={(id) =>
-                  setSelected(id ? data.nodes.find((n) => n.id === id) ?? null : null)
-                }
-                height={620}
-              />
-            )}
-            {data && data.nodes.length > 0 && (
-              <MetaBar meta={data.meta} nodes={data.nodes.length} edges={data.edges.length} />
-            )}
-          </div>
-
-          <aside className="tool-side">
-            {data && data.nodes.length > 0 && (
-              <Sidebar data={data} selected={selected} onSelect={setSelected} />
-            )}
-          </aside>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ---------- Sidebar ---------- */
-
-function Sidebar({
-  data,
-  selected,
-  onSelect,
-}: {
-  data: GraphPayload;
-  selected: GraphNode | null;
-  onSelect: (n: GraphNode | null) => void;
-}) {
   const clusters = useMemo(() => {
-    const m = new Map<
-      number,
-      {
-        id: number;
-        label: string;
-        color: string;
-        members: GraphNode[];
-      }
-    >();
-    data.nodes.forEach((n) => {
-      if (!m.has(n.cluster)) {
-        m.set(n.cluster, {
-          id: n.cluster,
-          label: n.clusterLabel ?? `Cluster ${n.cluster}`,
-          color: n.clusterColor ?? "#7dd3fc",
-          members: [],
-        });
-      }
-      m.get(n.cluster)!.members.push(n);
-    });
-    return [...m.values()].sort((a, b) => b.members.length - a.members.length);
-  }, [data]);
-
-  if (selected) {
-    return (
-      <NodeDetail node={selected} data={data} onBack={() => onSelect(null)} />
-    );
-  }
-
-  return (
-    <div className="side-pane">
-      <div className="side-head">
-        <span className="mono dim">CLUSTERS</span>
-        <span className="mono dim">{clusters.length}</span>
-      </div>
-      <div className="side-clusters">
-        {clusters.map((c) => {
-          const topLeader = [...c.members].sort(
-            (a, b) => b.centrality - a.centrality
-          )[0];
-          return (
-            <div key={c.id} className="cluster-row">
-              <div className="cluster-row-head">
-                <span
-                  className="cluster-dot"
-                  style={{ background: c.color, boxShadow: `0 0 10px ${c.color}` }}
-                />
-                <span className="cluster-label mono">{c.label}</span>
-                <span className="cluster-count mono dim">
-                  {c.members.length} stocks
-                </span>
-              </div>
-              <div className="cluster-leader">
-                <span className="dim mono">LEADER</span>
-                <button
-                  type="button"
-                  className="leader-btn"
-                  onClick={() => onSelect(topLeader)}
-                >
-                  {topLeader.symbol}
-                  <span className="leader-cent mono">
-                    c={topLeader.centrality.toFixed(2)}
-                  </span>
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="side-hint">
-        <span className="mono dim">→</span> Click any node to inspect.
-      </div>
-    </div>
-  );
-}
-
-function NodeDetail({
-  node,
-  data,
-  onBack,
-}: {
-  node: GraphNode;
-  data: GraphPayload;
-  onBack: () => void;
-}) {
-  const neighbors = useMemo(() => {
-    const out: Array<{ node: GraphNode; weight: number }> = [];
-    for (const e of data.edges) {
-      if (e.source === node.id) {
-        const n = data.nodes.find((x) => x.id === e.target);
-        if (n) out.push({ node: n, weight: e.weight });
-      } else if (e.target === node.id) {
-        const n = data.nodes.find((x) => x.id === e.source);
-        if (n) out.push({ node: n, weight: e.weight });
-      }
+    if (!f) return [];
+    const m = new Map<number, { id: number; members: Array<{ id: string; centrality: number }> }>();
+    for (const n of f.nodes) {
+      if (!m.has(n.community)) m.set(n.community, { id: n.community, members: [] });
+      m.get(n.community)!.members.push({ id: n.id, centrality: n.centrality });
     }
-    return out.sort((a, b) => b.weight - a.weight).slice(0, 10);
-  }, [node, data]);
+    return [...m.values()]
+      .map((c) => ({
+        ...c,
+        members: c.members.sort((a, b) => b.centrality - a.centrality),
+      }))
+      .sort((a, b) => b.members.length - a.members.length);
+  }, [f]);
+
+  const node = useMemo(
+    () => (selected && f ? f.nodes.find((n) => n.id === selected) ?? null : null),
+    [selected, f]
+  );
+
+  const neighbours = useMemo(() => {
+    if (!selected || !f) return [];
+    const out: Array<{ id: string; rho: number; community: number }> = [];
+    const comm = new Map(f.nodes.map((n) => [n.id, n.community]));
+    for (const e of f.edges) {
+      const other =
+        e.source === selected ? e.target : e.target === selected ? e.source : null;
+      if (other) out.push({ id: other, rho: e.rho, community: comm.get(other) ?? 0 });
+    }
+    return out.sort((a, b) => Math.abs(b.rho) - Math.abs(a.rho));
+  }, [selected, f]);
 
   return (
-    <div className="side-pane">
-      <button className="side-back mono" onClick={onBack}>
-        ← back to clusters
-      </button>
-      <div className="node-detail-head">
-        <div
-          className="node-color-chip"
-          style={{
-            background: node.clusterColor,
-            boxShadow: `0 0 10px ${node.clusterColor}`,
-          }}
-        />
-        <div>
-          <div className="node-symbol">{node.symbol}</div>
-          <div className="node-name dim">{node.name}</div>
+    <>
+      <Navbar />
+      <main className="tool-page">
+        <div className="wrap">
+          <div className="tool-head">
+            <div>
+              <div className="label">Fig. 2 — Full plate</div>
+              <h1>The correlation network</h1>
+              <p>
+                The NIFTY-50 drawn by correlation structure: a Mantegna minimum spanning tree over
+                the daily-return correlation matrix, communities by Louvain, node radius by
+                eigenvector centrality. Hover a stock to trace its neighbourhood hop by hop. Drag
+                the scrubber to change the estimation window and watch what moves.
+              </p>
+            </div>
+            <Link href="/" className="btn btn-quiet">
+              ← Back to the paper
+            </Link>
+          </div>
+
+          <div className="tool-layout">
+            <div className="plate">
+              {isLoading && <div className="overlay">Recomputing six graphs — this is live</div>}
+              {!isLoading && !frames.length && (
+                <div className="overlay">
+                  Live graph unavailable. We would rather show nothing than something invented.
+                </div>
+              )}
+
+              {frames.length > 0 && (
+                <>
+                  <PlotterGraph
+                    frames={frames}
+                    frame={i}
+                    height={640}
+                    selected={selected}
+                    onSelect={setSelected}
+                    labelTopK={14}
+                  />
+
+                  <div className="scrub">
+                    <span className="scrub-label">
+                      WINDOW <b>{f?.lookback}</b> bars
+                    </span>
+                    <div className="scrub-track" role="group" aria-label="Estimation window">
+                      {frames.map((fr, k) => (
+                        <button
+                          key={fr.lookback}
+                          type="button"
+                          className={`scrub-step${k === i ? " on" : ""}`}
+                          onClick={() => setI(k)}
+                          aria-label={`${fr.lookback}-bar window`}
+                          aria-pressed={k === i}
+                        />
+                      ))}
+                    </div>
+                    <span className="scrub-label">
+                      μ <b>{f?.modularity?.toFixed(3) ?? "—"}</b> · {f?.nCommunities} comm.
+                    </span>
+                  </div>
+
+                  <div className="legend">
+                    {clusters.map((c) => (
+                      <span className="legend-item" key={c.id}>
+                        <span
+                          className="legend-key"
+                          style={{
+                            color: clusterInk(c.id),
+                            backgroundImage: `repeating-linear-gradient(${hatchAngle(
+                              c.id
+                            )}deg, ${clusterInk(c.id)} 0 1px, transparent 1px 4px)`,
+                          }}
+                        />
+                        C{c.id} <span className="dim">({c.members.length})</span>
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <aside className="side">
+              {!node && (
+                <>
+                  <div className="side-head">
+                    <span className="label">Communities</span>
+                    <span className="label">{clusters.length}</span>
+                  </div>
+                  {clusters.map((c) => (
+                    <div className="cluster-row" key={c.id}>
+                      <div className="cluster-top">
+                        <span className="swatch" style={{ background: clusterInk(c.id) }} />
+                        <span className="cluster-name">C{c.id}</span>
+                        <span className="cluster-n">{c.members.length} stocks</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="cluster-lead"
+                        onClick={() => setSelected(c.members[0].id)}
+                      >
+                        <span>most central</span>
+                        <b>
+                          {c.members[0].id} · {c.members[0].centrality.toFixed(3)}
+                        </b>
+                      </button>
+                    </div>
+                  ))}
+                  <p className="hint" style={{ marginTop: "var(--space-3)" }}>
+                    Click any node to inspect it. Centrality is normalised within the frame, so the
+                    most central stock in each window reads 1.000.
+                  </p>
+                </>
+              )}
+
+              {node && (
+                <>
+                  <button type="button" className="cluster-lead" onClick={() => setSelected(null)}>
+                    ← back to communities
+                  </button>
+                  <div className="side-head" style={{ marginTop: "var(--space-2)" }}>
+                    <span className="cluster-name">{node.id}</span>
+                    <span className="swatch" style={{ background: clusterInk(node.community) }} />
+                  </div>
+                  <div className="stat-grid">
+                    <div className="stat">
+                      <div className="label">Community</div>
+                      <div className="stat-v">C{node.community}</div>
+                    </div>
+                    <div className="stat">
+                      <div className="label">Eigenvector</div>
+                      <div className="stat-v" style={{ color: "var(--signal)" }}>
+                        {node.centrality.toFixed(3)}
+                      </div>
+                    </div>
+                    <div className="stat">
+                      <div className="label">Degree</div>
+                      <div className="stat-v">{neighbours.length}</div>
+                    </div>
+                    <div className="stat">
+                      <div className="label">Window</div>
+                      <div className="stat-v">{f?.lookback}</div>
+                    </div>
+                  </div>
+
+                  <div className="side-head">
+                    <span className="label">Tree neighbours</span>
+                    <span className="label">ρ</span>
+                  </div>
+                  {neighbours.map((n) => (
+                    <button
+                      key={n.id}
+                      type="button"
+                      className="cluster-lead"
+                      onClick={() => setSelected(n.id)}
+                    >
+                      <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        <span className="swatch" style={{ background: clusterInk(n.community) }} />
+                        {n.id}
+                      </span>
+                      <b>{n.rho.toFixed(3)}</b>
+                    </button>
+                  ))}
+                  {!neighbours.length && <p className="hint">No tree edges in this frame.</p>}
+                </>
+              )}
+            </aside>
+          </div>
+
+          <p className="fig-caption">
+            <b>Fig. 2</b> — NIFTY-50 correlation network, MST over Pearson daily-return
+            correlations, <b>n={f?.nodes.length ?? 49}</b>, <b>{f?.edges.length ?? 48}</b> edges, as
+            of <b>{fmtDate(f?.asOf ?? null)}</b>. Estimation window <b>{f?.lookback ?? 60}</b> bars.
+            Louvain communities <b>{f?.nCommunities ?? "—"}</b>, modularity{" "}
+            <b>{f?.modularity?.toFixed(3) ?? "—"}</b>. Edges are undirected — Skylife&apos;s own
+            lead-lag study finds no directed pair surviving an FDR-10% null, so this figure draws
+            none.
+          </p>
         </div>
-      </div>
-
-      <div className="node-stats">
-        <Stat label="CLUSTER" value={node.clusterLabel ?? String(node.cluster)} />
-        <Stat
-          label="CENTRALITY"
-          value={node.centrality.toFixed(3)}
-          color="var(--accent)"
-        />
-        <Stat
-          label="MOMENTUM"
-          value={`${node.momentum >= 0 ? "+" : ""}${node.momentum.toFixed(1)}%`}
-          color={node.momentum >= 0 ? "var(--accent-2)" : "var(--danger)"}
-        />
-        {node.marketCap && (
-          <Stat
-            label="MCAP (CR)"
-            value={`₹${new Intl.NumberFormat("en-IN").format(node.marketCap)}`}
-          />
-        )}
-      </div>
-
-      <div className="neighbors-head mono dim">
-        <span>TOP CORRELATED</span>
-        <span>ρ</span>
-      </div>
-      <div className="neighbors-list">
-        {neighbors.map((n) => (
-          <div key={n.node.id} className="neighbor-row">
-            <span
-              className="neighbor-dot"
-              style={{ background: n.node.clusterColor }}
-            />
-            <span className="neighbor-sym mono">{n.node.symbol}</span>
-            <span className="neighbor-name dim">{n.node.name}</span>
-            <span className="neighbor-weight mono">{n.weight.toFixed(2)}</span>
-          </div>
-        ))}
-        {neighbors.length === 0 && (
-          <div className="dim mono" style={{ padding: "12px 0" }}>
-            No correlations ≥ threshold.
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  color,
-}: {
-  label: string;
-  value: string;
-  color?: string;
-}) {
-  return (
-    <div className="stat-cell">
-      <div className="mono dim stat-label">{label}</div>
-      <div className="stat-value" style={color ? { color } : undefined}>
-        {value}
-      </div>
-    </div>
-  );
-}
-
-/* ---------- Meta / loading / error ---------- */
-
-function MetaBar({
-  meta,
-  nodes,
-  edges,
-}: {
-  meta: GraphMeta;
-  nodes: number;
-  edges: number;
-}) {
-  return (
-    <div className="tool-meta mono">
-      <span className="dim">UNIVERSE</span>
-      <span>{meta.universe ?? "NIFTY50"}</span>
-      <span className="dim">·</span>
-      <span className="dim">NODES</span>
-      <span>{nodes}</span>
-      <span className="dim">·</span>
-      <span className="dim">EDGES</span>
-      <span>{edges}</span>
-      <span className="dim">·</span>
-      <span className="dim">MODULARITY</span>
-      <span style={{ color: "var(--accent-2)" }}>
-        {meta.modularity?.toFixed(3) ?? "—"}
-      </span>
-      {meta.asOf && (
-        <>
-          <span className="dim">·</span>
-          <span className="dim">AS OF</span>
-          <span>{meta.asOf.slice(0, 10)}</span>
-        </>
-      )}
-      {meta.fallback && (
-        <>
-          <span className="dim">·</span>
-          <span style={{ color: "var(--warn)" }}>LIVE FEED DOWN</span>
-        </>
-      )}
-    </div>
-  );
-}
-
-function LoadingOverlay() {
-  return (
-    <div className="tool-overlay">
-      <div className="tool-overlay-inner mono">
-        <span className="tool-spinner" />
-        <span>Loading network...</span>
-      </div>
-    </div>
-  );
-}
-
-function ErrorState({ message }: { message: string }) {
-  return (
-    <div className="tool-overlay">
-      <div className="tool-overlay-inner mono" style={{ color: "var(--danger)" }}>
-        Failed to load: {message}
-      </div>
-    </div>
+      </main>
+    </>
   );
 }

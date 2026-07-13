@@ -1,120 +1,100 @@
 "use client";
 
-import { motion } from "framer-motion";
 import { usePulse } from "@/lib/usePulse";
-import { CountUp } from "@/components/CountUp";
-
-const EASE = [0.16, 1, 0.3, 1] as const;
 
 /**
- * How the engine actually works — every claim here is something the code does.
- * (The previous copy advertised a NIFTY-500 universe, 2018 history, and intraday
- * cluster-breakdown alerts. None of those exist.)
+ * §2 — Methods. A numbered procedure, because it genuinely IS one. (Numbering is only legitimate
+ * when the content is a real sequence; this is.)
+ *
+ * Every parameter quoted here is one the code actually uses, and the live ones are read from
+ * /api/public/pulse rather than typed in.
  */
-const STEPS = [
-  {
-    n: "01",
-    tag: "RETURNS",
-    title: "Log returns, session-aligned",
-    body:
-      "Every stock's OHLCV is resampled from 1-minute bars to your interval, then converted to log returns over a trailing window you choose — 60 bars by default.",
-    metric: ["Intervals", "1m → 1w"],
-  },
-  {
-    n: "02",
-    tag: "GRAPH",
-    title: "Correlation becomes structure",
-    body:
-      "Pearson (or Spearman) correlation across the window gives a dense matrix. We sparsify it into a graph — a Mantegna minimum spanning tree by default, or kNN, threshold, or complete.",
-    metric: ["Methods", "MST · kNN · θ"],
-  },
-  {
-    n: "03",
-    tag: "CENTRALITY",
-    title: "Where each stock sits",
-    body:
-      "Louvain finds the communities; five centrality measures score each stock's position — eigenvector, PageRank, degree strength, betweenness, closeness. Rebuilt per as-of day, so you see it move.",
-    metric: ["Metrics", "5 per stock"],
-  },
-];
-
 export function Methodology() {
   const { pulse } = usePulse();
 
   return (
-    <section id="methodology" className="section">
+    <section id="methods" className="section">
       <div className="wrap">
-        <motion.div
-          className="sec-head"
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.4 }}
-          transition={{ duration: 0.6, ease: EASE }}
-        >
+        <div className="section-head">
+          <div className="label">§ 2 — Methods</div>
           <div>
-            <div className="sec-eyebrow mono">◉ HOW IT WORKS</div>
-            <h2 className="sec-title">
+            <h2>
               Prices in. <em>Structure out.</em>
             </h2>
+            <p className="section-lede">
+              Most signals stop at the stock. These start at the edges between them — and no step is
+              a black box.
+            </p>
           </div>
-          <p className="sec-desc">
-            Most signals stop at the stock. Ours start at the{" "}
-            <span className="em-strong">edges</span> between them — and no step is a black box.
-          </p>
-        </motion.div>
-
-        <div className="steps">
-          {STEPS.map((s, i) => (
-            <motion.div
-              key={s.n}
-              className="step"
-              initial={{ opacity: 0, y: 22 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.3 }}
-              transition={{ duration: 0.55, ease: EASE, delay: i * 0.08 }}
-            >
-              <div className="step-rail">
-                <span className="step-n mono">{s.n}</span>
-                {i < STEPS.length - 1 && <span className="step-line" />}
-              </div>
-              <div className="step-body">
-                <div className="step-tag mono">{s.tag}</div>
-                <h3>{s.title}</h3>
-                <p>{s.body}</p>
-                <div className="step-metric">
-                  <span className="mono dim">{s.metric[0]}</span>
-                  <b className="mono">{s.metric[1]}</b>
-                </div>
-              </div>
-            </motion.div>
-          ))}
         </div>
 
-        <motion.div
-          className="coverage"
-          initial={{ opacity: 0, y: 18 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.3 }}
-          transition={{ duration: 0.6, ease: EASE }}
-        >
-          <div className="cov">
-            <div className="cov-label mono">COVERAGE</div>
-            <div className="cov-val">NIFTY 50</div>
-            <div className="cov-sub">
-              <CountUp value={pulse?.stocks} /> tradable names · NSE
+        <div className="methods">
+          <div className="method">
+            <div className="method-n">2.1</div>
+            <div>
+              <h3>Returns</h3>
+              <p>
+                Each stock&apos;s OHLCV is resampled from 1-minute bars to the chosen interval and
+                converted to log returns over a trailing window. History begins 2025-01-01; there is
+                none before it and we do not pretend otherwise.
+              </p>
+              <div className="method-param">
+                intervals <b>1m · 5m · 15m · 1h · 1d</b> · default window <b>60 bars</b>
+              </div>
             </div>
           </div>
-          <div className="cov">
-            <div className="cov-label mono">GRANULARITY</div>
-            <div className="cov-val">1-minute</div>
-            <div className="cov-sub">Resampled to any interval, 1m → 1w</div>
+
+          <div className="method">
+            <div className="method-n">2.2</div>
+            <div>
+              <h3>Correlation becomes structure</h3>
+              <p>
+                Pearson (or Spearman) correlation across the window gives a dense matrix. We
+                sparsify it into a graph: a Mantegna minimum spanning tree by default — the 1999
+                econophysics construction this whole aesthetic is borrowed from — or kNN, a
+                correlation threshold, or the complete graph.
+              </p>
+              <div className="method-param">
+                methods <b>mst · knn · threshold · complete</b> · edges today{" "}
+                <b>{pulse?.edges ?? "—"}</b>
+              </div>
+            </div>
           </div>
-          <div className="cov">
-            <div className="cov-label mono">HISTORY</div>
-            <div className="cov-val">2025 →</div>
-            <div className="cov-sub">Rebuilt every session, not backfilled</div>
+
+          <div className="method">
+            <div className="method-n">2.3</div>
+            <div>
+              <h3>Communities and centrality</h3>
+              <p>
+                Louvain recovers the communities with a fixed seed, so the same window always yields
+                the same partition and cluster ids do not shuffle between calls. Five centrality
+                measures then score each stock&apos;s position. Modularity is reported with every
+                result so you can judge how real the separation is.
+              </p>
+              <div className="method-param">
+                metrics <b>eigenvector · pagerank · degree · betweenness · closeness</b> · modularity
+                today <b>{pulse?.modularity?.toFixed(3) ?? "—"}</b>
+              </div>
+            </div>
           </div>
-        </motion.div>
+
+          <div className="method">
+            <div className="method-n">2.4</div>
+            <div>
+              <h3>What we did not find</h3>
+              <p>
+                We tested directed lead-lag across every ordered pair in the universe. Zero of 2,450
+                pairs survived a 10% false-discovery-rate null. There is therefore no directional
+                claim anywhere in this product, no arrow between two stocks, and no animation
+                implying that one leads another. A negative result is still a result, and reporting
+                it is cheaper than being caught not reporting it.
+              </p>
+              <div className="method-param">
+                directed pairs tested <b>2,450</b> · surviving FDR-10% <b>0</b>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );

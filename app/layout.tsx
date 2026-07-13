@@ -1,47 +1,69 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Inter_Tight, IBM_Plex_Mono } from "next/font/google";
+import { Instrument_Serif, Source_Serif_4, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/firebase/AuthProvider";
 
-const inter = Inter({
+/* The serif IS the signature. No competitor in dark-quant-SaaS is running one — it reads as
+   published research rather than product marketing, which is exactly the posture we want. */
+const display = Instrument_Serif({
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-inter",
+  weight: ["400"],
+  style: ["normal", "italic"],
+  variable: "--font-display",
   display: "swap",
 });
 
-const interTight = Inter_Tight({
+/* A paper is READ. Long-form body text is a serif. */
+const body = Source_Serif_4({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-inter-tight",
+  weight: ["400", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-body",
   display: "swap",
 });
 
-const plexMono = IBM_Plex_Mono({
+/* Mono is for tabular figures, tickers, timestamps and figure captions. NOTHING else. */
+const mono = JetBrains_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-plex-mono",
+  weight: ["400", "500", "700"],
+  variable: "--font-mono",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Skylife Research — The market isn't a list. It's a network.",
+  title: "Structure and Its Motion in the Indian Equity Market — Skylife Research",
   description:
-    "Per-stock network centrality on the NIFTY-50, rebuilt every session. Track who is becoming a hub and who is drifting to the edge — with the graph engine you run yourself.",
+    "We rebuild the correlation graph of the NIFTY-50 and measure each stock's position within it. Community structure by Louvain. We make no directional claim: lead-lag does not survive an FDR-10% null.",
   openGraph: {
-    title: "Skylife Research — The market isn't a list. It's a network.",
+    title: "Structure and Its Motion in the Indian Equity Market",
     description:
-      "Graph-theory-powered quantitative research for the Indian stock market.",
-    type: "website",
+      "Graph-theoretic market-structure research on the NIFTY-50. Run the engine yourself.",
+    type: "article",
   },
-  icons: {
-    icon: "/favicon.svg",
-  },
+  icons: { icon: "/favicon.svg" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#05070d",
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f4f1ea" },
+    { media: "(prefers-color-scheme: dark)", color: "#0b0f19" },
+  ],
 };
+
+/**
+ * Resolve the theme BEFORE first paint, or the page flashes the wrong stock.
+ * Paper is the default; the OS preference and then the user's stored choice override it.
+ */
+const THEME_BOOT = `
+(function(){
+  try{
+    var s = localStorage.getItem('slr-theme');
+    var t = s || (matchMedia('(prefers-color-scheme: dark)').matches ? 'ink' : 'paper');
+    document.documentElement.setAttribute('data-theme', t);
+  }catch(e){
+    document.documentElement.setAttribute('data-theme','paper');
+  }
+})();`;
 
 export default function RootLayout({
   children,
@@ -49,8 +71,13 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${inter.variable} ${interTight.variable} ${plexMono.variable} js-ready`}
+      data-theme="paper"
+      className={`${display.variable} ${body.variable} ${mono.variable}`}
+      suppressHydrationWarning
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
+      </head>
       <body>
         <AuthProvider>{children}</AuthProvider>
       </body>

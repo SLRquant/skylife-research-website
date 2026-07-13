@@ -1,120 +1,78 @@
 "use client";
 
-import Link from "next/link";
-import { motion } from "framer-motion";
-import { HeroCanvas } from "@/components/HeroCanvas";
-import { CountUp } from "@/components/CountUp";
 import { usePulse } from "@/lib/usePulse";
 
-const rise = {
-  hidden: { opacity: 0, y: 20 },
-  show: { opacity: 1, y: 0 },
-};
-
-// stagger children ~60ms apart; ease-out so they settle rather than snap
-const group = {
-  hidden: {},
-  show: { transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
-};
-
-const EASE = [0.16, 1, 0.3, 1] as const;
-
+/**
+ * The paper's head: title, byline, ABSTRACT.
+ *
+ * No hero. No pill. No gradient headline. No fade-up-and-stagger. A paper opens with an abstract,
+ * and the abstract states the limitation IN THE FIRST SCREEN — because the honesty is the brand,
+ * and because a quant who reads "we make no directional claim" before the pitch is a quant who
+ * will believe the rest of the page.
+ *
+ * Every number here comes from /api/public/pulse. Nothing is typed in by hand.
+ */
 export function Hero() {
-  const { pulse } = usePulse();
+  const { pulse, isLoading } = usePulse();
 
-  const leader = pulse?.leaders?.[0];
   const asOf = pulse?.asOf
-    ? new Date(pulse.asOf).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })
+    ? new Date(pulse.asOf).toLocaleDateString("en-IN", {
+        year: "numeric", month: "long", day: "numeric",
+      })
     : null;
 
   return (
-    <section className="hero">
-      <HeroCanvas />
-      <div className="hero-veil" aria-hidden="true" />
+    <section className="paper-head">
+      <div className="wrap">
+        <h1 className="title">
+          Structure and Its <em>Motion</em> in the Indian Equity Market
+        </h1>
 
-      <div className="wrap hero-inner">
-        <motion.div variants={group} initial="hidden" animate="show">
-          <motion.div
-            variants={rise}
-            transition={{ duration: 0.6, ease: EASE }}
-            className="hero-pill"
-          >
-            <span className={`hero-dot${pulse?.live ? " live" : ""}`} />
-            <span className="mono">
-              {pulse?.live ? "LIVE" : "CONNECTING"}
-            </span>
-            <span className="hero-pill-sep" />
-            <span className="mono dim">
-              {pulse ? `${pulse.universe} · graph rebuilt ${asOf ?? "—"}` : "loading market graph…"}
-            </span>
-          </motion.div>
+        <div className="byline">
+          <span>Skylife Research</span>
+          <span className="sep">·</span>
+          <span>NSE · NIFTY-50 (n={pulse?.stocks ?? 49})</span>
+          <span className="sep">·</span>
+          <span>1-minute bars, 2025-01-01 →</span>
+          <span className="sep">·</span>
+          <span>
+            Graph rebuilt {asOf ?? (isLoading ? "…" : "—")}
+            {pulse && !pulse.live && " (last known — live feed down)"}
+          </span>
+        </div>
 
-          <motion.h1
-            variants={rise}
-            transition={{ duration: 0.7, ease: EASE }}
-            className="hero-h"
-          >
-            The market isn&apos;t a list.
-            <br />
-            <span className="hero-h-accent">It&apos;s a network.</span>
-          </motion.h1>
+        <div className="abstract">
+          <div className="label">Abstract</div>
+          <div className="abstract-body">
+            <p>
+              We rebuild the correlation graph of the NIFTY-50 for every trading session and measure
+              each stock&apos;s position within it. Log returns over a trailing window give a Pearson
+              correlation matrix; the matrix is sparsified into a graph — a Mantegna minimum
+              spanning tree by default — and community structure is recovered by Louvain. Five
+              centrality measures then score every stock&apos;s position in that network, and because
+              the graph is rebuilt per as-of day, the position can be watched to <em>move</em>.
+            </p>
+            <p>
+              On the most recent session the tree carries{" "}
+              <strong>{pulse?.edges ?? "—"} edges</strong> over{" "}
+              <strong>{pulse?.stocks ?? "—"} names</strong> and resolves into{" "}
+              <strong>{pulse?.communities ?? "—"} communities</strong> at a modularity of{" "}
+              <strong>{pulse?.modularity?.toFixed(3) ?? "—"}</strong>. The most central name is{" "}
+              <strong>{pulse?.leaders?.[0]?.symbol ?? "—"}</strong> (eigenvector{" "}
+              {pulse?.leaders?.[0]?.centrality?.toFixed(3) ?? "—"}).
+            </p>
 
-          <motion.p
-            variants={rise}
-            transition={{ duration: 0.6, ease: EASE }}
-            className="hero-sub"
-          >
-            We rebuild the NIFTY-50 correlation graph every session and measure where each stock
-            sits inside it — who is becoming a hub, who is drifting to the edge. Run it yourself,
-            on your own parameters.
-          </motion.p>
-
-          <motion.div
-            variants={rise}
-            transition={{ duration: 0.6, ease: EASE }}
-            className="hero-ctas"
-          >
-            <Link className="btn btn-primary btn-lg btn-glow" href="/dashboard/graph-stats">
-              Run the graph <span className="arr">→</span>
-            </Link>
-            <Link className="btn btn-ghost btn-lg" href="/network-graph">
-              See today&apos;s clusters <span className="arr">→</span>
-            </Link>
-          </motion.div>
-
-          {/* Real numbers, straight from the engine — not marketing copy. */}
-          <motion.dl
-            variants={rise}
-            transition={{ duration: 0.6, ease: EASE }}
-            className="hero-stats"
-          >
-            <div>
-              <dt className="mono">STOCKS</dt>
-              <dd>
-                <CountUp value={pulse?.stocks} />
-              </dd>
-            </div>
-            <div>
-              <dt className="mono">CLUSTERS</dt>
-              <dd>
-                <CountUp value={pulse?.communities} />
-              </dd>
-            </div>
-            <div>
-              <dt className="mono">MODULARITY</dt>
-              <dd className="accent">
-                <CountUp value={pulse?.modularity} decimals={3} />
-              </dd>
-            </div>
-            <div>
-              <dt className="mono">MOST CENTRAL</dt>
-              <dd className="sym">{leader?.symbol ?? "—"}</dd>
-            </div>
-          </motion.dl>
-        </motion.div>
+            <p className="caveat">
+              <strong>We make no directional claim.</strong> Lead-lag between these stocks does not
+              survive an FDR-10% null — zero of 2,450 directed pairs — so nothing on this site
+              animates a causal flow from one stock to another, and nothing here is an entry signal.
+              What we measure is structure: who is central, who is peripheral, and how much of that
+              is real rather than an artifact of the estimation window. Fig. 1 is about exactly that
+              last question, and it does not flatter us.
+            </p>
+          </div>
+        </div>
       </div>
-
-      <div className="hero-fade" aria-hidden="true" />
     </section>
   );
 }

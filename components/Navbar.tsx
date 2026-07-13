@@ -1,84 +1,37 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Logo } from "./Logo";
-import { MarketStatus } from "./MarketStatus";
+import { ThemeToggle } from "./ThemeToggle";
 import { useAuth } from "@/lib/firebase/AuthProvider";
 
+/**
+ * The masthead of a journal, not the nav bar of a SaaS app.
+ * No backdrop-blur, no glass, no pill. One hairline rule and the name of the publication.
+ */
 export function Navbar() {
-  const [scrolled, setScrolled] = useState(false);
-  const [open, setOpen] = useState(false);
-  const headerRef = useRef<HTMLElement>(null);
   const { user } = useAuth();
 
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 20);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  const closeMenu = () => setOpen(false);
-
   return (
-    <header
-      ref={headerRef}
-      className={`site-header${scrolled ? " scrolled" : ""}`}
-    >
-      <div className="wrap nav-inner">
-        <Logo href="/" />
-        <nav
-          className={`nav-links${open ? " open" : ""}`}
-          aria-label="Primary"
-        >
-          <Link href="/#platform" onClick={closeMenu}>
-            Platform
-          </Link>
-          <Link href="/network-graph" onClick={closeMenu}>
-            Network Graph
-          </Link>
-          <Link href="/#methodology" onClick={closeMenu}>
-            Methodology
-          </Link>
-          <Link href="/#pricing" onClick={closeMenu}>
-            Pricing
-          </Link>
-          <Link href="/#contact" onClick={closeMenu}>
-            Contact
-          </Link>
-          <Link
-            href="/#pricing"
-            className="mobile-cta"
-            onClick={closeMenu}
-          >
-            Start 7-day trial →
-          </Link>
+    <header className="masthead">
+      <div className="wrap masthead-inner">
+        <Link href="/" className="brand" aria-label="Skylife Research — home">
+          <span>Skylife Research</span>
+          <span className="sub">NSE · NIFTY-50</span>
+        </Link>
+
+        <nav className="masthead-nav" aria-label="Primary">
+          <Link href="/#figure-1">Fig. 1</Link>
+          <Link href="/#methods">Methods</Link>
+          <Link href="/network-graph">Graph</Link>
+          <Link href="/#access">Access</Link>
+          <Link href="/#contact">Contact</Link>
         </nav>
-        <div className="nav-right">
-          <MarketStatus />
-          {user ? (
-            <Link className="btn btn-ghost nav-signin" href="/dashboard">
-              Dashboard
-            </Link>
-          ) : (
-            <Link className="btn btn-ghost nav-signin" href="/auth/sign-in">
-              Sign in
-            </Link>
-          )}
-          <Link className="btn btn-primary" href="/#pricing">
-            Start 7-day trial
+
+        <div className="masthead-right">
+          <ThemeToggle />
+          <Link className="btn" href={user ? "/dashboard" : "/auth/sign-in"}>
+            {user ? "Dashboard" : "Sign in"}
           </Link>
-          <button
-            className={`nav-toggle${open ? " open" : ""}`}
-            aria-label="Open menu"
-            aria-expanded={open}
-            onClick={() => setOpen((v) => !v)}
-          >
-            <span />
-            <span />
-            <span />
-          </button>
         </div>
       </div>
     </header>

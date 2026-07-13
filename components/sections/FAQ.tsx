@@ -1,77 +1,62 @@
-"use client";
-
-import { motion } from "framer-motion";
-
-const EASE = [0.16, 1, 0.3, 1] as const;
-
 /**
- * Honest answers only. The previous copy claimed backtests to 2018, a NIFTY-500 benchmark
- * study, intraday cluster-breakdown alerts and a PMS registration — none of which exist.
- * Overclaiming to traders is the fastest way to lose them.
+ * §5 — Discussion. Honest answers only.
+ * The previous copy claimed backtests to 2018, a NIFTY-500 benchmark study, intraday
+ * cluster-breakdown alerts and a PMS registration. None of those exist.
  */
 const ITEMS = [
   {
-    q: "What universe and history do you actually cover?",
-    a: "The NIFTY-50 — 49 tradable names — on NSE. Underlying data is 1-minute bars from January 2025, resampled to whatever interval you ask for (1m, 5m, 15m, 1h, 1d, 1w). We don't claim history we don't have.",
+    q: "Is this a signal I can trade directly?",
+    a: "No — and we'd rather say so. Graph Stats measures market structure: who is central, who is peripheral, and how that shifts. It is a research input, not an entry or exit signal. Anyone selling you centrality as alpha is skipping several steps.",
   },
   {
-    q: "Can I run it on my own symbols?",
-    a: "Yes. Pass any comma-separated symbol list instead of the default universe, up to 50 names, and the whole pipeline runs on that set. Custom universes beyond NIFTY-50 are on the roadmap for Enterprise.",
+    q: "Why does Fig. 1 sweep the estimation window instead of time?",
+    a: "Because that is the sequence the engine can actually produce, and we will not fabricate the one it cannot. The API returns the edge list for the latest as-of date only — there is no parameter that asks for the tree as of a past date — so a true day-by-day sequence of graphs does not exist to be fetched. Sweeping the window does produce a sequence of genuinely recomputed trees, and it answers a sharper question anyway: how much of a stock's network role is a property of the market, and how much is a property of your window? Roughly half the tree's edges change between a 30-bar and a 120-bar window. That is worth knowing before you trust any single frame.",
+  },
+  {
+    q: "What universe and history do you actually cover?",
+    a: "The NIFTY-50 — 49 tradable names — on NSE. TMPV is excluded because it has no price history. Underlying data is 1-minute bars from January 2025, resampled to whatever interval you ask for. We do not claim history we do not have.",
   },
   {
     q: "Why Louvain, and is the clustering stable?",
-    a: "Louvain is fast enough to rebuild the graph per as-of day, which is what makes the time series possible. We run it with a fixed seed, so the same window always yields the same partition — cluster IDs don't shuffle between calls. Modularity is reported with every result so you can judge how real the separation is.",
+    a: "Louvain is fast enough to rebuild the graph per as-of day, which is what makes the time series possible at all. We run it with a fixed seed, so the same window always yields the same partition. Stability across windows is a different question, and Fig. 1 is our answer to it: the partition moves between six and eight communities as the window widens. We show you that rather than hiding it.",
   },
   {
-    q: "Is this a signal I can trade directly?",
-    a: "No — and we'd rather say so. Graph Stats measures market structure: who is central, who is peripheral, and how that shifts. It's a research input, not an entry/exit signal. Anyone selling you centrality as alpha is skipping several steps.",
+    q: "Can I run it on my own symbols?",
+    a: "Yes. Pass any comma-separated symbol list instead of the default universe, up to 50 names, and the whole pipeline runs on that set.",
   },
   {
     q: "How fresh is the data?",
-    a: "The graph is rebuilt from the database on each run. A full-universe query takes roughly 10–15 seconds because it genuinely recomputes every graph in your window rather than serving a cached picture.",
+    a: "The graph is rebuilt from the database on each run. A full-universe query takes roughly 10–15 seconds because it genuinely recomputes every graph in your window rather than serving a cached picture. The figures on this page are cached for an hour so that public traffic cannot bill the engine.",
   },
 ];
 
 export function FAQ() {
   return (
-    <section id="faq" className="section">
+    <section id="discussion" className="section">
       <div className="wrap">
-        <motion.div
-          className="sec-head"
-          initial={{ opacity: 0, y: 16 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true, amount: 0.4 }}
-          transition={{ duration: 0.6, ease: EASE }}
-        >
+        <div className="section-head">
+          <div className="label">§ 5 — Discussion</div>
           <div>
-            <div className="sec-eyebrow mono">❯ FAQ</div>
-            <h2 className="sec-title">
+            <h2>
               Skeptical? <em>Good.</em>
             </h2>
+            <p className="section-lede">
+              The questions a serious desk asks before it trusts anyone&apos;s numbers.
+            </p>
           </div>
-          <p className="sec-desc">
-            The questions a serious desk asks before it trusts anyone&apos;s numbers.
-          </p>
-        </motion.div>
+        </div>
 
-        <div className="faq">
-          {ITEMS.map((it, i) => (
-            <motion.details
-              className="faq-item"
-              key={it.q}
-              initial={{ opacity: 0, y: 14 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.5 }}
-              transition={{ duration: 0.45, ease: EASE, delay: i * 0.05 }}
-            >
+        <div className="qa">
+          {ITEMS.map((it) => (
+            <details className="qa-item" key={it.q}>
               <summary>
-                <span className="faq-q">{it.q}</span>
-                <span className="faq-plus" aria-hidden="true">
-                  ＋
+                <span className="qa-q">{it.q}</span>
+                <span className="qa-mark" aria-hidden="true">
+                  [+]
                 </span>
               </summary>
-              <div className="faq-a">{it.a}</div>
-            </motion.details>
+              <div className="qa-a">{it.a}</div>
+            </details>
           ))}
         </div>
       </div>

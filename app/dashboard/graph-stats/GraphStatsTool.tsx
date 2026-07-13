@@ -8,8 +8,8 @@ import { authedFetch } from "@/lib/firebase/client";
 import { useAuth } from "@/lib/firebase/AuthProvider";
 import { Leaderboard } from "@/components/graph-stats/Leaderboard";
 import { TimeSeriesChart } from "@/components/graph-stats/TimeSeriesChart";
-import { GraphCanvas } from "@/components/GraphCanvas";
-import { clusterColor } from "@/components/graph-stats/colors";
+import { PlotterGraph } from "@/components/PlotterGraph";
+
 import type { LatestGraph, RollingData, Series } from "@/lib/graph-stats";
 import {
   ALL_GRAPH_METHODS,
@@ -35,7 +35,7 @@ const METRICS = [
 /** Renders a validation message directly beneath its own input. */
 function FieldErr({ msg }: { msg?: string }) {
   return msg ? (
-    <span className="gs-field-err" role="alert">
+    <span className="err" role="alert">
       {msg}
     </span>
   ) : null;
@@ -281,52 +281,44 @@ export function GraphStatsTool() {
 
   return (
     <>
-      <div className="grid-bg" aria-hidden="true" />
-      <div className="glow" aria-hidden="true" />
       <Navbar />
       <ProtectedRoute>
         <main className="tool-page">
-          <div className="wrap tool-wrap">
-            <header className="tool-header">
+          <div className="wrap">
+            <header className="tool-head">
               <div>
-                <div className="eyebrow" style={{ marginBottom: 8 }}>
-                  <span className="eb-primary">◉ MEMBERS TOOL</span>
-                  <span className="sep">/</span>
-                  <span>graph statistics over time</span>
-                </div>
-                <h1 className="tool-title">Graph Stats</h1>
-                <p className="tool-sub">
+                <div className="label">Members instrument — graph statistics over time</div>
+                <h1 >Graph Stats</h1>
+                <p >
                   Per-stock network centrality, tracked across time. One correlation graph is
                   rebuilt for every as-of day, and each stock&apos;s position in that network is
                   measured — so you can see who is <em>becoming</em> a hub.
                 </p>
               </div>
-              <Link href="/dashboard" className="btn btn-ghost tool-back">
+              <Link href="/dashboard" className="btn btn-quiet">
                 <span>← Dashboard</span>
               </Link>
             </header>
 
             {blocked && (
-              <div className="gs-blocked">
-                <div className="mono dim" style={{ fontSize: 11, letterSpacing: ".2em" }}>
-                  ◉ GOOGLE ACCOUNT REQUIRED
-                </div>
+              <div className="notice">
+                <div className="label">Google account required</div>
                 <p>{blocked}</p>
                 <p className="dim">
-                  You&apos;re signed in as <span className="mono">{user?.email}</span> using
+                  You&apos;re signed in as <span >{user?.email}</span> using
                   email/password. Sign out and use <strong>Sign in with Google</strong> to access
                   this tool.
                 </p>
-                <Link href="/auth/sign-in" className="btn btn-primary">
+                <Link href="/auth/sign-in" className="btn btn-solid">
                   Go to sign in →
                 </Link>
               </div>
             )}
 
             {/* ---- params ---- */}
-            <section className="gs-params" style={blocked ? { opacity: 0.35, pointerEvents: "none" } : undefined}>
-              <div className="gs-params-grid">
-                <label className={`gs-field${errs.interval ? " has-err" : ""}`}>
+            <section className="params" style={blocked ? { opacity: 0.35, pointerEvents: "none" } : undefined}>
+              <div className="params-grid">
+                <label className={`field${errs.interval ? " has-err" : ""}`}>
                   <span>Interval</span>
                   <select value={interval} onChange={(e) => setInterval(e.target.value)}>
                     {/* Locked options stay VISIBLE but disabled — hiding them hides the reason
@@ -344,7 +336,7 @@ export function GraphStatsTool() {
                   <FieldErr msg={errs.interval} />
                 </label>
 
-                <label className={`gs-field${errs.lookback ? " has-err" : ""}`}>
+                <label className={`field${errs.lookback ? " has-err" : ""}`}>
                   <span>Lookback</span>
                   <input
                     type="number"
@@ -356,11 +348,11 @@ export function GraphStatsTool() {
                   />
                   {/* Helper text sits BELOW the input — keeping it in the label made the label
                       wrap to two lines and knocked this field out of the row's alignment. */}
-                  <span className="gs-hint">bars · max {limits.lookbackMax}</span>
+                  <span className="hint">bars · max {limits.lookbackMax}</span>
                   <FieldErr msg={errs.lookback} />
                 </label>
 
-                <label className={`gs-field${errs.graph_method ? " has-err" : ""}`}>
+                <label className={`field${errs.graph_method ? " has-err" : ""}`}>
                   <span>Graph method</span>
                   <select value={graphMethod} onChange={(e) => setGraphMethod(e.target.value)}>
                     {ALL_GRAPH_METHODS.map((m) => {
@@ -377,7 +369,7 @@ export function GraphStatsTool() {
                 </label>
 
                 {graphMethod === "knn" && (
-                  <label className="gs-field">
+                  <label className="field">
                     <span>k</span>
                     <input
                       type="number"
@@ -386,12 +378,12 @@ export function GraphStatsTool() {
                       value={knnK}
                       onChange={(e) => setKnnK(Number(e.target.value))}
                     />
-                    <span className="gs-hint">neighbours</span>
+                    <span className="hint">neighbours</span>
                   </label>
                 )}
 
                 {graphMethod === "threshold" && (
-                  <label className="gs-field">
+                  <label className="field">
                     <span>|ρ| threshold</span>
                     <input
                       type="number"
@@ -401,11 +393,11 @@ export function GraphStatsTool() {
                       value={corrThreshold}
                       onChange={(e) => setCorrThreshold(Number(e.target.value))}
                     />
-                    <span className="gs-hint">|correlation| cutoff</span>
+                    <span className="hint">|correlation| cutoff</span>
                   </label>
                 )}
 
-                <label className={`gs-field gs-field-wide${errs.symbols ? " has-err" : ""}`}>
+                <label className={`field field-wide${errs.symbols ? " has-err" : ""}`}>
                   <span>Symbols</span>
                   <input
                     type="text"
@@ -414,19 +406,19 @@ export function GraphStatsTool() {
                     value={symbols}
                     onChange={(e) => setSymbols(e.target.value)}
                   />
-                  <span className="gs-hint">blank = all NIFTY-50 · max {limits.symbolsMax}</span>
+                  <span className="hint">blank = all NIFTY-50 · max {limits.symbolsMax}</span>
                   <FieldErr msg={errs.symbols} />
                 </label>
               </div>
 
-              <div className="gs-metrics">
-                <span className="mono dim gs-metrics-label">METRICS</span>
+              <div className="btn-row">
+                <span className="label">METRICS</span>
                 {METRICS.map((m) => (
                   <button
                     key={m.id}
                     type="button"
                     title={m.hint}
-                    className={`gs-chip${metrics.includes(m.id) ? " on" : ""}`}
+                    className={`btn${metrics.includes(m.id) ? " on" : ""}`}
                     onClick={() => toggleMetric(m.id)}
                   >
                     {m.label}
@@ -435,9 +427,9 @@ export function GraphStatsTool() {
                 <FieldErr msg={errs.metrics} />
               </div>
 
-              <div className="gs-actions">
+              <div className="params-actions">
                 <button
-                  className="btn btn-primary"
+                  className="btn btn-solid"
                   onClick={run}
                   disabled={loading || exhausted || !!blocked}
                 >
@@ -445,13 +437,13 @@ export function GraphStatsTool() {
                 </button>
 
                 {loading && (
-                  <button className="btn btn-ghost gs-cancel" onClick={cancel}>
+                  <button className="btn btn-quiet" onClick={cancel}>
                     Cancel
                   </button>
                 )}
 
                 {quota && (
-                  <span className={`gs-quota${exhausted ? " out" : ""}`}>
+                  <span className={`quota${exhausted ? " out" : ""}`}>
                     {quota.admin ? (
                       <>∞ unlimited runs</>
                     ) : (
@@ -462,36 +454,36 @@ export function GraphStatsTool() {
                   </span>
                 )}
 
-                <span className={`gs-tier gs-tier-${tier}`}>{limits.label}</span>
+                <span className="quota">{limits.label}</span>
 
                 {result && (
-                  <button className="btn btn-ghost" onClick={exportCsv}>
+                  <button className="btn btn-quiet" onClick={exportCsv}>
                     Export CSV
                   </button>
                 )}
               </div>
               {upsell && (
-                <div className="gs-upsell">
-                  <div className="gs-upsell-body">
-                    <span className="gs-upsell-tag mono">🔒 PRO FEATURE</span>
+                <div className="notice">
+                  <div >
+                    <span className="label">🔒 PRO FEATURE</span>
                     <p>{upsell}</p>
                   </div>
-                  <Link href="/#pricing" className="btn btn-primary">
+                  <Link href="/#pricing" className="btn btn-solid">
                     See plans <span className="arr">→</span>
                   </Link>
                 </div>
               )}
 
               {exhausted && (
-                <p className="form-err">
+                <p className="err">
                   You&apos;ve used all {quota?.limit} of your runs.{" "}
                   <Link href="/#contact">Contact us</Link> to raise your limit.
                 </p>
               )}
-              {error && <p className="form-err">{error}</p>}
+              {error && <p className="err">{error}</p>}
               
               {missing.length > 0 && (
-                <p className="form-note" style={{ color: "var(--warn)" }}>
+                <p className="hint" style={{ color: "var(--warn)" }}>
                   Not found, so excluded: {missing.join(", ")}
                 </p>
               )}
@@ -500,19 +492,19 @@ export function GraphStatsTool() {
             {/* ---- results ---- */}
             {result && (
               <>
-                <div className="gs-metric-tabs">
+                <div className="btn-row">
                   {result.data.metrics.map((m) => (
                     <button
                       key={m}
-                      className={`gs-tab${activeMetric === m ? " on" : ""}`}
+                      className={`btn${activeMetric === m ? " on" : ""}`}
                       onClick={() => setActiveMetric(m)}
                     >
                       {METRICS.find((x) => x.id === m)?.label ?? m}
                     </button>
                   ))}
                 </div>
-                <section className="gs-results">
-                  <div className="gs-main">
+                <section className="plate">
+                  <div >
                     <TimeSeriesChart
                       series={series}
                       metric={activeMetric}
@@ -533,14 +525,14 @@ export function GraphStatsTool() {
                 {/* The network is its own full-width surface. Crammed into a 380px sidebar it
                     was unreadable; here it has room and can be collapsed when not wanted. */}
                 {graph && (
-                  <section className="gs-network">
+                  <section className="fig">
                     <button
                       type="button"
-                      className="gs-network-head"
+                      className="fig-head"
                       onClick={() => setShowGraph((v) => !v)}
                       aria-expanded={showGraph}
                     >
-                      <span className="mono gs-network-title">
+                      <span className="fig-n">
                         ◇ LATEST NETWORK
                         <span className="dim">
                           {"  "}· {graph.nodes} nodes · {graph.n_communities} clusters ·
@@ -548,30 +540,47 @@ export function GraphStatsTool() {
                           {graph.asof_date.slice(0, 10)}
                         </span>
                       </span>
-                      <span className="mono dim">{showGraph ? "HIDE ▲" : "SHOW ▼"}</span>
+                      <span className="label">{showGraph ? "HIDE ▲" : "SHOW ▼"}</span>
                     </button>
 
                     {showGraph && (
-                      <>
-                        <GraphCanvas
-                          nodes={Object.entries(graph.communities).map(([sym, c]) => ({
-                            id: sym,
-                            symbol: sym,
-                            cluster: c,
-                            clusterColor: clusterColor(c),
-                            centrality: normCentrality[sym] ?? 0.2,
-                          }))}
-                          edges={graph.edge_list}
+                      <div className="plate">
+                        <PlotterGraph
+                          frames={[
+                            {
+                              lookback,
+                              asOf: graph.asof_date,
+                              nodes: Object.entries(graph.communities).map(([sym, c]) => ({
+                                id: sym,
+                                community: c,
+                                centrality: normCentrality[sym] ?? 0.2,
+                              })),
+                              edges: graph.edge_list.map((e) => ({
+                                source: e.source,
+                                target: e.target,
+                                rho: e.corr ?? e.weight,
+                              })),
+                              nCommunities: graph.n_communities,
+                              modularity: graph.modularity,
+                            },
+                          ]}
+                          height={560}
                           selected={null}
                           onSelect={(id) => id && toggleSymbol(id)}
-                          height={560}
                         />
-                        <p className="gs-network-note dim">
-                          Node size ={" "}
-                          {METRICS.find((x) => x.id === activeMetric)?.label}. Click a node to
-                          cross-filter the chart above.
-                        </p>
-                      </>
+                      </div>
+                    )}
+                    {showGraph && (
+                      <p className="fig-caption">
+                        <b>Fig. A</b> — Latest network for this run. Method{" "}
+                        <b>{graph.method}</b>, <b>{graph.nodes}</b> nodes, <b>{graph.edges}</b>{" "}
+                        edges, window <b>{lookback}</b> bars, as of{" "}
+                        <b>{graph.asof_date.slice(0, 10)}</b>. Louvain communities{" "}
+                        <b>{graph.n_communities}</b>, modularity{" "}
+                        <b>{graph.modularity?.toFixed(3) ?? "—"}</b>. Node radius ∝{" "}
+                        {METRICS.find((x) => x.id === activeMetric)?.label}. Click a node to
+                        cross-filter the chart above.
+                      </p>
                     )}
                   </section>
                 )}
@@ -579,7 +588,7 @@ export function GraphStatsTool() {
             )}
 
             {!result && !loading && (
-              <div className="gs-empty mono dim">
+              <div className="empty">
                 Pick your parameters and hit <strong>Run analysis</strong>.
               </div>
             )}

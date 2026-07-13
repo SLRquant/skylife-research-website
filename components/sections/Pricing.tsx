@@ -1,141 +1,105 @@
 import Link from "next/link";
+import { TIERS } from "@/lib/graph-stats-schema";
 
-function Check() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.5"
-    >
-      <path d="M5 12l5 5L20 7" />
-    </svg>
-  );
-}
+/**
+ * DEFECT 5 — FIXED.
+ *
+ * This section used to advertise "Cluster-break alerts (intraday)", a "Co-integrated pairs report"
+ * and a "Portfolio risk graph" — while the Platform section one scroll away marked Portfolio
+ * Overlap as IN BUILD and the FAQ explicitly said those features don't exist. Selling a quant
+ * audience three features your own page disowns is the fastest way to lose them.
+ *
+ * So: we sell ONLY what the code actually enforces. The real feature ladder is the tier system in
+ * `lib/graph-stats-schema.ts` — intervals, graph methods, lookback depth, run count — enforced
+ * server-side in `app/api/graph-stats/run/route.ts`. Every row below is READ FROM that same
+ * module, so this table cannot drift from what the API will really let you do.
+ *
+ * Prices are TBD because they are, in fact, TBD.
+ */
+
+const fmtList = (xs: readonly string[]) => xs.join(" · ");
 
 export function Pricing() {
+  const free = TIERS.free;
+  const paid = TIERS.paid;
+
   return (
-    <section id="pricing" className="section">
+    <section id="access" className="section">
       <div className="wrap">
-        <div className="sec-head">
+        <div className="section-head">
+          <div className="label">§ 4 — Access</div>
           <div>
-            <div className="sec-eyebrow">⟢ Plans</div>
-            <h2 className="sec-title">
-              One product, <em>three ways in.</em>
+            <h2>
+              What you can <em>actually</em> run.
             </h2>
+            <p className="section-lede">
+              There is one product — the engine — and two levels of access to it. The rows below are
+              read straight out of the tier schema the server enforces, so this table cannot drift
+              from what the API will really let you do.
+            </p>
           </div>
-          <p className="sec-desc">
-            Start solo. Upgrade when your book grows. Add custom delivery when
-            your desk needs it.
-          </p>
         </div>
-        <div className="pricing">
-          <article className="plan">
-            <div className="plan-name">◦ Starter</div>
-            <div className="plan-price">
-              ₹999<small> / month</small>
+
+        <div className="tiers">
+          <article className="tier">
+            <div className="label">Free</div>
+            <div className="tier-price">
+              ₹0<small> / forever</small>
             </div>
-            <p className="plan-desc">
-              For the active retail trader running their own book.
-            </p>
-            <ul>
-              <li>
-                <Check />
-                Daily cluster momentum report (email)
-              </li>
-              <li>
-                <Check />
-                Top 10 cluster-leader stocks
-              </li>
-              <li>
-                <Check />
-                NIFTY-50 coverage
-              </li>
-              <li>
-                <Check />
-                Weekly methodology note
-              </li>
-            </ul>
-            <Link className="btn btn-ghost" href="#contact">
-              Start 7-day trial
+            <dl>
+              <dt>Intervals</dt>
+              <dd>{fmtList(free.intervals)}</dd>
+              <dt>Graph methods</dt>
+              <dd>{fmtList(free.graphMethods)}</dd>
+              <dt>Lookback</dt>
+              <dd>≤ {free.lookbackMax} bars</dd>
+              <dt>Symbols</dt>
+              <dd>≤ {free.symbolsMax}</dd>
+              <dt>Runs</dt>
+              <dd>{free.runs ?? "∞"}</dd>
+              <dt>CSV export</dt>
+              <dd>Yes</dd>
+            </dl>
+            <Link className="btn" href="/dashboard/graph-stats">
+              Run it →
             </Link>
           </article>
-          <article className="plan featured">
-            <div className="plan-badge">Most popular</div>
-            <div className="plan-name">◉ Professional</div>
-            <div className="plan-price">
-              ₹2,999<small> / month</small>
+
+          <article className="tier">
+            <div className="label">Paid</div>
+            <div className="tier-price">
+              TBD<small> — not priced yet</small>
             </div>
-            <p className="plan-desc">
-              For RIAs and family offices managing 10–50 client portfolios.
-            </p>
-            <ul>
-              <li>
-                <Check />
-                Daily cluster momentum report
-              </li>
-              <li>
-                <Check />
-                Top 10 cluster-leader stocks
-              </li>
-              <li>
-                <Check />
-                Portfolio risk graph (web dashboard)
-              </li>
-              <li>
-                <Check />
-                Co-integrated pairs report
-              </li>
-              <li>
-                <Check />
-                Cluster-break alerts (intraday)
-              </li>
-            </ul>
-            <Link className="btn btn-primary" href="#contact">
-              Start 7-day trial
-            </Link>
-          </article>
-          <article className="plan">
-            <div className="plan-name">◆ Enterprise</div>
-            <div className="plan-price">Custom</div>
-            <p className="plan-desc">
-              For prop desks and funds integrating signals into an execution
-              stack.
-            </p>
-            <ul>
-              <li>
-                <Check />
-                Everything in Professional
-              </li>
-              <li>
-                <Check />
-                Network graph API (REST + websockets)
-              </li>
-              <li>
-                <Check />
-                Custom universe beyond NIFTY-50
-              </li>
-              <li>
-                <Check />
-                SLA, dedicated support, onboarding
-              </li>
-            </ul>
-            <Link className="btn btn-ghost" href="#contact">
-              Request the data sheet
+            <dl>
+              <dt>Intervals</dt>
+              <dd>{fmtList(paid.intervals)}</dd>
+              <dt>Graph methods</dt>
+              <dd>{fmtList(paid.graphMethods)}</dd>
+              <dt>Lookback</dt>
+              <dd>≤ {paid.lookbackMax} bars</dd>
+              <dt>Symbols</dt>
+              <dd>≤ {paid.symbolsMax}</dd>
+              <dt>Runs</dt>
+              <dd>Unlimited</dd>
+              <dt>CSV export</dt>
+              <dd>Yes</dd>
+            </dl>
+            <Link className="btn btn-solid" href="#contact">
+              Talk to us →
             </Link>
           </article>
         </div>
-        <div className="disclaimer">
-          <span className="warn-ico">⚠</span>
-          <span>
-            Skylife Research provides quantitative research and data feeds, not
-            investment advice. Trading in financial markets involves risk. Past
-            performance of graph-based models is not indicative of future
-            results.
-          </span>
-        </div>
+
+        <p className="notice">
+          The paid caps above are the ENGINE&apos;s hard ceilings, not a paywall: a request past
+          them cannot be served inside the 60-second function budget. There is no lookback past 300
+          bars because there is no data past it — the history begins 2025-01-01.
+        </p>
+
+        <p className="notice">
+          Skylife Research publishes quantitative research and data. It is not investment advice,
+          and a market-structure measurement is not a trading signal — see §5, and the abstract.
+        </p>
       </div>
     </section>
   );
