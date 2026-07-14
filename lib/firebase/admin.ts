@@ -34,12 +34,53 @@ export function isDevStub(): boolean {
 
 let appInstance: App | null = null;
 
+/**
+ * Read the service account, tolerating how it actually arrives in the wild.
+ *
+ * A 3,180-character secret gets pasted into a dashboard by a human. It picks up a trailing
+ * newline, or surrounding quotes, or the person pastes the raw JSON instead of the base64. Each
+ * of those produced the same opaque `SyntaxError: Unexpected end of JSON input` from a bare
+ * JSON.parse(Buffer.from(...)) — which says nothing about what to fix.
+ *
+ * So: strip the wrapping, accept BOTH encodings, and if it still won't parse, say which one it
+ * looked like and how long it was. The value itself is never logged.
+ */
+function readServiceAccount(): Record<string, string> {
+  const raw = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
+  if (!raw?.trim()) throw new Error("FIREBASE_SERVICE_ACCOUNT_B64 is not set");
+
+  // Trailing newlines from a paste; quotes some dashboards wrap the value in.
+  const cleaned = raw.trim().replace(/^["']|["']$/g, "");
+
+  // Raw JSON pasted directly instead of base64 — accept it rather than fail cryptically.
+  const text = cleaned.startsWith("{")
+    ? cleaned
+    : Buffer.from(cleaned, "base64").toString("utf8");
+
+  let json: Record<string, string>;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error(
+      `FIREBASE_SERVICE_ACCOUNT_B64 could not be parsed: it looks like ` +
+        `${cleaned.startsWith("{") ? "raw JSON" : "base64"}, is ${cleaned.length} chars, and ` +
+        `decoded to ${text.length} bytes that are not valid JSON. Re-copy it as ONE line with ` +
+        `no line breaks.`
+    );
+  }
+
+  for (const k of ["project_id", "client_email", "private_key"] as const) {
+    if (!json[k]) throw new Error(`FIREBASE_SERVICE_ACCOUNT_B64 is missing "${k}"`);
+  }
+  // A private key pasted through a form often arrives with literal \n instead of real newlines.
+  json.private_key = json.private_key.replace(/\\n/g, "\n");
+  return json;
+}
+
 function adminApp(): App {
   if (appInstance) return appInstance;
-  const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
-  if (!b64) throw new Error("FIREBASE_SERVICE_ACCOUNT_B64 is not set");
+  const json = readServiceAccount();
 
-  const json = JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
   appInstance = getApps().length
     ? getApp()
     : initializeApp({

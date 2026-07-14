@@ -64,9 +64,24 @@ export async function GET(req: Request) {
   // 3. Does the service account decode, and does Firebase accept it? A value mangled by a stray
   //    newline in the Vercel paste would fail exactly here, and nowhere earlier.
   try {
-    const b64 = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
-    if (!b64) throw new Error("not set");
-    const json = JSON.parse(Buffer.from(b64, "base64").toString("utf8"));
+    const raw = process.env.FIREBASE_SERVICE_ACCOUNT_B64;
+    if (!raw) throw new Error("not set");
+    const cleaned = raw.trim().replace(/^["']|["']$/g, "");
+    const text = cleaned.startsWith("{") ? cleaned : Buffer.from(cleaned, "base64").toString("utf8");
+
+    // Shape of the decode, never its content. Enough to see a truncation or a bad paste:
+    // a healthy service account decodes to ~2385 bytes starting '{' and ending '}'.
+    out.decode = {
+      rawLength: raw.length,
+      trimmedLength: cleaned.length,
+      strippedChars: raw.length - cleaned.length,
+      looksLike: cleaned.startsWith("{") ? "raw JSON" : "base64",
+      decodedBytes: text.length,
+      startsWith: text.slice(0, 12),
+      endsWith: text.slice(-12),
+    };
+
+    const json = JSON.parse(text);
     out.serviceAccount = {
       decoded: true,
       type: json.type,

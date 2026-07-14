@@ -31,6 +31,18 @@
     "use-debounce": "^10.0.6",
     "zod": "^4.2.1"
   },
+  "//overrides": [
+    "firebase-admin@14 -> jwks-rsa@4.1.0 -> jose@6. jose@6 is ESM-ONLY ('type': 'module'),",
+    "but jwks-rsa loads it with `const jose = require('jose')` — a CommonJS require() of an ES",
+    "module. Node only tolerates that from v22.12/23 onward, so it works on a modern dev machine",
+    "and THROWS on Vercel's Node. The throw happens at module import of firebase-admin/auth,",
+    "before any route code, which is why it surfaced as an HTML 500 that no in-handler guard",
+    "could catch. jose@5 is the last release with a CommonJS build; jwks-rsa's usage is",
+    "compatible with it. Remove this override once jwks-rsa ships an ESM-safe import."
+  ],
+  "overrides": {
+    "jose": "^5.10.0"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
