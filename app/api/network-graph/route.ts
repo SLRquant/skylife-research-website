@@ -36,6 +36,24 @@ const BASE = process.env.GRAPH_STATS_API_BASE ?? "https://graph-api.skyliferesea
 export const LOOKBACKS = [30, 40, 50, 60, 75, 90, 105, 120] as const;
 const DEFAULT_LOOKBACK = 60;
 
+/**
+ * Why the graph is missing, in terms the operator can act on. Distinguishing these matters:
+ * "the key isn't set" and "the key is set but we can't reach the box" look identical from the
+ * browser and have opposite fixes. None of these values leak anything — no key material, no URL,
+ * no upstream body — they name a class of failure, nothing more.
+ */
+type Reason =
+  | "not_configured" // GRAPH_STATS_API_KEY absent from this runtime -> set it in Vercel
+  | "upstream_unreachable" // DNS/TLS/firewall/timeout -> the API is up but Vercel can't get to it
+  | "upstream_rejected" // we reached it and it said no (401 = wrong key, 4xx/5xx = its problem)
+  | "bad_payload"; // reached, authorised, but the response wasn't the shape we expect
+
+class GraphUnavailable extends Error {
+  constructor(readonly reason: Reason, message: string) {
+    super(message);
+  }
+}
+
 export async function GET(req: Request) {
   const key = process.env.GRAPH_STATS_API_KEY;
 
@@ -53,17 +71,40 @@ export async function GET(req: Request) {
   });
 
   try {
-    if (!key) throw new Error("GRAPH_STATS_API_KEY not set");
+    if (!key) {
+      throw new GraphUnavailable(
+        "not_configured",
+        "GRAPH_STATS_API_KEY is not set in this runtime"
+      );
+    }
 
-    const res = await fetch(`${BASE}/v1/graph-stats/chart?${q}`, {
-      headers: { "x-api-key": key, Accept: "application/json" },
-      next: { revalidate },
-      signal: AbortSignal.timeout(45_000),
-    });
-    if (!res.ok) throw new Error(`upstream ${res.status}`);
+    let res: Response;
+    try {
+      res = await fetch(`${BASE}/v1/graph-stats/chart?${q}`, {
+        headers: { "x-api-key": key, Accept: "application/json" },
+        next: { revalidate },
+        signal: AbortSignal.timeout(45_000),
+      });
+    } catch (e) {
+      // fetch() only rejects when the request never got an answer: DNS, TLS, connection refused,
+      // a security group that drops us, or the 45s timeout. The key is irrelevant here.
+      throw new GraphUnavailable(
+        "upstream_unreachable",
+        `cannot reach ${BASE}: ${e instanceof Error ? e.message : e}`
+      );
+    }
+
+    if (!res.ok) {
+      throw new GraphUnavailable(
+        "upstream_rejected",
+        `upstream ${res.status}` + (res.status === 401 ? " (the API key was rejected)" : "")
+      );
+    }
 
     const body = await res.json();
-    if (!body?.success || body.data?.type !== "snapshot") throw new Error("bad payload");
+    if (!body?.success || body.data?.type !== "snapshot") {
+      throw new GraphUnavailable("bad_payload", "upstream returned an unexpected shape");
+    }
 
     const d = body.data;
     const communities: Record<string, number> = d.graph.communities ?? {};
@@ -108,14 +149,27 @@ export async function GET(req: Request) {
     );
   } catch (e) {
     // Surface the failure instead of quietly serving invented numbers as if they were real.
-    console.error("[network-graph] upstream failed", e instanceof Error ? e.message : e);
+    const reason: Reason = e instanceof GraphUnavailable ? e.reason : "bad_payload";
+    const detail = e instanceof Error ? e.message : String(e);
+    console.error(`[network-graph] ${reason}: ${detail}`);
+
     return NextResponse.json(
       {
         nodes: [],
         edges: [],
-        meta: { universe: "NIFTY 50", lookback, fallback: true, error: "Live graph unavailable." },
+        meta: {
+          universe: "NIFTY 50",
+          lookback,
+          fallback: true,
+          error: "Live graph unavailable.",
+          // The operator can read this straight off the network tab without Vercel log access.
+          // It says WHICH failure, never anything about the credential itself.
+          reason,
+        },
       },
-      { status: 200, headers: { "Cache-Control": "public, s-maxage=60" } }
+      // s-maxage=0: a misconfiguration must not get cached for an hour. The moment the env var
+      // lands and the box is reachable, the very next request serves a real graph.
+      { status: 200, headers: { "Cache-Control": "public, s-maxage=0, must-revalidate" } }
     );
   }
 }
