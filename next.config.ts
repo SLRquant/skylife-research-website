@@ -41,6 +41,21 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
 
+  /**
+   * firebase-admin must NOT be bundled — it has to be require()d from node_modules at runtime.
+   *
+   * It resolves gRPC / protobufjs / farmhash through dynamic requires that no bundler can trace
+   * statically. `next start` on a dev box hides this, because the whole node_modules tree is on
+   * disk either way. A Vercel serverless function only ships the files the tracer FOUND — so the
+   * import throws at module load, which Next renders as an HTML error page. The browser then
+   * JSON.parse()s "<!DOCTYPE html>" and the user is told
+   * `Unexpected token '<', "<!DOCTYPE "... is not valid JSON`.
+   *
+   * That failure happens *before* any handler code, which is why the config preflight inside the
+   * route could never catch it. This line is the actual fix; the preflight is the safety net.
+   */
+  serverExternalPackages: ["firebase-admin"],
+
   // Don't advertise the framework version to attackers.
   poweredByHeader: false,
 
