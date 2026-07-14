@@ -12,6 +12,7 @@ import { CancelledError, fetchGraphStats, ParamsSchema, UpstreamError } from "@/
 import { validateForTier } from "@/lib/graph-stats-schema";
 import { QuotaExceeded, logRun, readQuota, refund, reserve, tierFor } from "@/lib/quota";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { missingServerConfig, unconfiguredResponse } from "@/lib/server-config";
 
 // firebase-admin needs Node (not Edge). A live call takes ~11s, well over Vercel's 10s
 // default — 60s is the max allowed on the Hobby plan and is required here.
@@ -20,6 +21,15 @@ export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
 export async function POST(req: Request) {
+  // Before anything else: is this deployment even configured? verifyRequest() below THROWS when
+  // the service account is absent, which would otherwise reach the browser as an HTML error page.
+  const missing = missingServerConfig();
+  if (missing.length > 0) {
+    console.error(`[graph-stats] missing server env: ${missing.join(", ")}`);
+    const { body, status } = unconfiguredResponse();
+    return NextResponse.json(body, { status });
+  }
+
   // Backstop before we do any work: one client can't hold open a pile of 12s requests.
   const ip = rateLimit(`run:${clientIp(req)}`, 12, 60_000);
   if (!ip.ok) {

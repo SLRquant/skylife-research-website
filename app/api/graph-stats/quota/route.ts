@@ -6,11 +6,20 @@ import { NextResponse } from "next/server";
 import { checkToolAccess, verifyRequest } from "@/lib/firebase/admin";
 import { readQuota, tierFor } from "@/lib/quota";
 import { TIERS } from "@/lib/graph-stats-schema";
+import { missingServerConfig, unconfiguredResponse } from "@/lib/server-config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export async function GET(req: Request) {
+  // Same guard as /run: an unconfigured deployment must answer in JSON, not an HTML 500.
+  const missing = missingServerConfig();
+  if (missing.length > 0) {
+    console.error(`[graph-stats] missing server env: ${missing.join(", ")}`);
+    const { body, status } = unconfiguredResponse();
+    return NextResponse.json(body, { status });
+  }
+
   const caller = await verifyRequest(req);
   if (!caller) {
     return NextResponse.json(

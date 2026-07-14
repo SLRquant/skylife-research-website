@@ -53,6 +53,28 @@ type Result = {
 
 const TOP_N = 8;
 
+/**
+ * Read a response as JSON without ever throwing a parser error at the user.
+ *
+ * Our routes answer in JSON on every path they control — but they do not control all of them. A
+ * platform-level failure (a crashed handler, a gateway timeout, a 404 from a bad rewrite) returns
+ * an HTML error page, and a bare `res.json()` on that surfaces as
+ * `Unexpected token '<', "<!DOCTYPE "... is not valid JSON` — a message that describes our parser
+ * instead of the user's problem. Translate it into something true and actionable.
+ */
+async function readJson(res: Response): Promise<Record<string, unknown>> {
+  const text = await res.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    throw new Error(
+      res.status >= 500
+        ? "The graph service is temporarily unavailable. Please try again in a moment."
+        : `The server returned an unreadable response (${res.status}).`
+    );
+  }
+}
+
 /** Rotating status verbs — a live-feeling message beats a static "Loading…". */
 const WORKING = [
   "Computing",
@@ -102,6 +124,12 @@ export function GraphStatsTool() {
         const j = await r.json().catch(() => null);
         if (r.status === 403) {
           setBlocked(j?.message ?? "This tool requires a Google account.");
+          return;
+        }
+        // A deployment missing its secrets can't serve anyone. Say so on load, rather than
+        // letting the user fill in the whole form and only then hit a wall.
+        if (r.status === 503) {
+          setBlocked(j?.message ?? "The graph service is temporarily unavailable.");
           return;
         }
         setBlocked(null);
@@ -198,7 +226,7 @@ export function GraphStatsTool() {
         body: JSON.stringify(payload),
         signal: ctrl.signal,
       });
-      const json = await res.json();
+      const json = (await readJson(res)) as any;
 
       if (!res.ok) {
         if (json.quota) setQuota(json.quota);
