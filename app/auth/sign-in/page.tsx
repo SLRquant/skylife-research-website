@@ -2,52 +2,25 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 import { useState } from "react";
-import {
-  getFirebaseAuth,
-  isFirebaseConfigured,
-  signInWithGoogle,
-} from "@/lib/firebase/client";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithGoogle } from "@/lib/firebase/client";
 import { Navbar } from "@/components/Navbar";
 import { Plate } from "@/components/Plate";
 import { GoogleButton } from "@/components/GoogleButton";
 
-const schema = z.object({
-  email: z.email("Enter a valid email"),
-  password: z.string().min(6, "Min 6 characters"),
-});
-type FormValues = z.infer<typeof schema>;
-
+/**
+ * Google only. Email/password sign-in is gone, matching sign-up.
+ *
+ * The tools are metered per email address, and email/password registration is free and unlimited —
+ * so the quota was a speed bump, not a limit. The server has always enforced this: `checkToolAccess`
+ * rejects any provider that isn't google.com. Keeping a password form on the front door only let
+ * someone sign in to an account that could not use the product, which is a worse experience than
+ * not offering it.
+ */
 export default function SignInPage() {
   const router = useRouter();
   const [err, setErr] = useState<string | null>(null);
-  const {
-    register,
-    handleSubmit,
-    formState: { errors, isSubmitting },
-  } = useForm<FormValues>({ resolver: zodResolver(schema) });
-
-  const onSubmit = async (v: FormValues) => {
-    setErr(null);
-    if (!isFirebaseConfigured()) {
-      setErr(
-        "Firebase is not configured. Add NEXT_PUBLIC_FIREBASE_* env vars in Vercel."
-      );
-      return;
-    }
-    const auth = getFirebaseAuth();
-    if (!auth) return;
-    try {
-      await signInWithEmailAndPassword(auth, v.email, v.password);
-      router.replace("/dashboard");
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "Sign-in failed");
-    }
-  };
+  const [busy, setBusy] = useState(false);
 
   return (
     <>
@@ -59,53 +32,32 @@ export default function SignInPage() {
           <p className="sub">Welcome back. Pull up your cluster dashboard.</p>
 
           <GoogleButton
-            label="Sign in with Google"
+            label={busy ? "Opening Google…" : "Sign in with Google"}
             onClick={async () => {
-              await signInWithGoogle();
-              router.replace("/dashboard");
+              setErr(null);
+              setBusy(true);
+              try {
+                await signInWithGoogle();
+                router.replace("/dashboard");
+              } finally {
+                setBusy(false);
+              }
             }}
-            onError={setErr}
+            onError={(m) => {
+              setBusy(false);
+              setErr(m);
+            }}
           />
-          <div className="auth-divider"><span>or</span></div>
 
-          <form
-            
-            onSubmit={handleSubmit(onSubmit)}
-            noValidate
-          >
-            <label className="field">
-              <span className="label">Email</span>
-              <input
-                type="email"
-                autoComplete="email"
-                {...register("email")}
-              />
-            </label>
-            {errors.email && (
-              <span className="form-err">{errors.email.message}</span>
-            )}
-            <label className="field">
-              <span className="label">Password</span>
-              <input
-                type="password"
-                autoComplete="current-password"
-                {...register("password")}
-              />
-            </label>
-            {errors.password && (
-              <span className="form-err">{errors.password.message}</span>
-            )}
-            <button
-              className="btn btn-primary"
-              type="submit"
-              disabled={isSubmitting}
-            >
-              {isSubmitting ? "Signing in…" : "Sign in"}
-            </button>
-            {err && <div className="form-err">{err}</div>}
-          </form>
+          {err && <div className="form-err" style={{ marginTop: "var(--space-3)" }}>{err}</div>}
+
+          <p className="auth-foot" style={{ marginTop: "var(--space-4)" }}>
+            We use Google sign-in only. The tools are metered per account, and a Google account is
+            what keeps that meter honest.
+          </p>
+
           <p className="auth-foot">
-            Don&apos;t have an account? <Link href="/auth/sign-up">Sign up</Link>
+            New here? <Link href="/auth/sign-up">Create an account</Link>
           </p>
         </div>
       </main>
