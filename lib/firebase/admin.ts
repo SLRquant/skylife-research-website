@@ -35,6 +35,25 @@ export function isDevStub(): boolean {
 let appInstance: App | null = null;
 
 /**
+ * Make a pasted base64 blob actually decodable.
+ *
+ * Node's base64 decoder STOPS at the first character outside the alphabet and returns whatever it
+ * had — so one stray character at the FRONT yields zero bytes and a downstream
+ * `SyntaxError: Unexpected end of JSON input` that names nothing useful.
+ *
+ * The real case that bit us: the value in Vercel began with `=`. Selecting the value out of a
+ * `.env` line is one character off from taking the `=` in `FIREBASE_SERVICE_ACCOUNT_B64=` with it.
+ * `=` is base64 PADDING — legal at the end, "stop here" at the start. The secret was otherwise
+ * perfect and decoded to nothing.
+ *
+ * So: drop everything outside the base64 alphabet (line breaks from a wrapped paste, zero-width
+ * characters, a BOM), then drop leading padding. This cannot corrupt a good value.
+ */
+function normalizeBase64(s: string): string {
+  return s.replace(/[^A-Za-z0-9+/=]/g, "").replace(/^=+/, "");
+}
+
+/**
  * Read the service account, tolerating how it actually arrives in the wild.
  *
  * A 3,180-character secret gets pasted into a dashboard by a human. It picks up a trailing
@@ -55,7 +74,7 @@ function readServiceAccount(): Record<string, string> {
   // Raw JSON pasted directly instead of base64 — accept it rather than fail cryptically.
   const text = cleaned.startsWith("{")
     ? cleaned
-    : Buffer.from(cleaned, "base64").toString("utf8");
+    : Buffer.from(normalizeBase64(cleaned), "base64").toString("utf8");
 
   let json: Record<string, string>;
   try {
