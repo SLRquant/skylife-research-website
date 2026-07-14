@@ -1,14 +1,24 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { Resend } from "resend";
+import { clientIp, rateLimit } from "@/lib/rate-limit";
 
 const schema = z.object({
-  name: z.string().min(1),
+  name: z.string().min(1).max(120),
   email: z.email(),
-  message: z.string().min(5),
+  message: z.string().min(5).max(5000),
 });
 
 export async function POST(req: Request) {
+  // Unauthenticated + sends email => a spam bot could drain the Resend quota. Cap it.
+  const limit = rateLimit(`contact:${clientIp(req)}`, 3, 60 * 60_000); // 3/hour per IP
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many messages. Please try again later." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+    );
+  }
+
   let body: unknown;
   try {
     body = await req.json();

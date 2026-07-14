@@ -13,9 +13,7 @@ const schema = z.object({
 type FormValues = z.infer<typeof schema>;
 
 export function Contact() {
-  const [state, setState] = useState<
-    { ok: true } | { ok: false; err: string } | null
-  >(null);
+  const [state, setState] = useState<{ ok: true } | { ok: false; err: string } | null>(null);
 
   const {
     register,
@@ -33,18 +31,13 @@ export function Contact() {
         body: JSON.stringify(values),
       });
       if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as {
-          error?: string;
-        };
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
         throw new Error(body.error ?? "Something went wrong");
       }
       setState({ ok: true });
       reset();
     } catch (err) {
-      setState({
-        ok: false,
-        err: err instanceof Error ? err.message : "Something went wrong",
-      });
+      setState({ ok: false, err: err instanceof Error ? err.message : "Something went wrong" });
     }
   };
 
@@ -53,97 +46,56 @@ export function Contact() {
       <div className="wrap">
         <div className="sec-head">
           <div>
-            <div className="sec-eyebrow">◎ Get in touch</div>
-            <h2 className="sec-title">
-              Two ways to <em>reach us.</em>
-            </h2>
+            <span className="label">Contact</span>
+            <h2 className="sec-title unfurl">Ask us anything.</h2>
           </div>
           <p className="sec-desc">
-            Pick the path that fits — whether you&apos;re evaluating for
-            yourself or for a desk.
+            Methodology, pricing, or an argument about whether modularity means anything at
+            n=49. We read every message.
           </p>
         </div>
+
         <div className="contact">
-          <div className="c-card hi">
-            <div className="c-tag">◆ INSTITUTIONAL</div>
-            <h3 className="c-title">
-              Book a 20-min <em>walkthrough.</em>
-            </h3>
-            <p className="c-desc">
-              Live network, live Q&amp;A. Bring one portfolio and we&apos;ll
-              show you the hidden concentration risk in under fifteen minutes.
+          <div>
+            <p style={{ color: "var(--text-2)", fontSize: "var(--text-sm)", maxWidth: "48ch" }}>
+              If you want to evaluate this for a desk, bring one portfolio and a window length you
+              trust. We will run the graph on it live and show you which of your positions are the
+              same bet.
             </p>
-            <a className="btn btn-primary" href="#">
-              Open calendar →
-            </a>
+            <dl className="readout" style={{ marginTop: "var(--space-5)" }}>
+              <div className="readout-cell">
+                <dt className="label">Response</dt>
+                <dd className="readout-val">24h</dd>
+              </div>
+              <div className="readout-cell">
+                <dt className="label">Based</dt>
+                <dd className="readout-val">Mumbai</dd>
+              </div>
+            </dl>
           </div>
-          <div className="c-card">
-            <div className="c-tag">◦ INDIVIDUAL</div>
-            <h3 className="c-title">
-              Ask us <em>anything.</em>
-            </h3>
-            <p className="c-desc">
-              Questions on methodology, pricing, or just want to geek out about
-              graph algorithms? We read every message and respond within 24
-              hours.
-            </p>
-            <form
-              className="contact-form"
-              onSubmit={handleSubmit(onSubmit)}
-              noValidate
-            >
-              <label>
-                <span>Name</span>
-                <input
-                  type="text"
-                  autoComplete="name"
-                  {...register("name")}
-                  aria-invalid={!!errors.name}
-                />
-              </label>
-              {errors.name && (
-                <span className="form-err">{errors.name.message}</span>
-              )}
-              <label>
-                <span>Email</span>
-                <input
-                  type="email"
-                  autoComplete="email"
-                  {...register("email")}
-                  aria-invalid={!!errors.email}
-                />
-              </label>
-              {errors.email && (
-                <span className="form-err">{errors.email.message}</span>
-              )}
-              <label>
-                <span>Message</span>
-                <textarea
-                  rows={3}
-                  {...register("message")}
-                  aria-invalid={!!errors.message}
-                />
-              </label>
-              {errors.message && (
-                <span className="form-err">{errors.message.message}</span>
-              )}
-              <button
-                className="btn btn-ghost"
-                type="submit"
-                disabled={isSubmitting}
-              >
-                {isSubmitting ? "Sending…" : "Send message"}
-              </button>
-              {state?.ok && (
-                <div className="form-note">
-                  Got it — we&apos;ll get back to you within 24 hours.
-                </div>
-              )}
-              {state && !state.ok && (
-                <div className="form-err">{state.err}</div>
-              )}
-            </form>
-          </div>
+
+          <form onSubmit={handleSubmit(onSubmit)} noValidate>
+            <label className="field">
+              <span className="label">Name</span>
+              <input type="text" autoComplete="name" {...register("name")} aria-invalid={!!errors.name} />
+              {errors.name && <span className="form-err">{errors.name.message}</span>}
+            </label>
+            <label className="field">
+              <span className="label">Email</span>
+              <input type="email" autoComplete="email" {...register("email")} aria-invalid={!!errors.email} />
+              {errors.email && <span className="form-err">{errors.email.message}</span>}
+            </label>
+            <label className="field">
+              <span className="label">Message</span>
+              <textarea rows={4} {...register("message")} aria-invalid={!!errors.message} />
+              {errors.message && <span className="form-err">{errors.message.message}</span>}
+            </label>
+            <button className="btn btn-primary" type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Sending…" : "Send message"}
+            </button>
+            {state?.ok && <p className="form-ok" style={{ marginTop: "var(--space-3)" }}>Received. We&apos;ll reply within 24 hours.</p>}
+            {state && !state.ok && <p className="form-err" style={{ marginTop: "var(--space-3)" }}>{state.err}</p>}
+          </form>
         </div>
       </div>
     </section>

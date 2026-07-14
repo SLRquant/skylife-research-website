@@ -1,24 +1,18 @@
 import Link from "next/link";
 
-export function Logo({ href = "#top" }: { href?: string }) {
+/** Drawn on the grid: three nodes, three edges, square. No gradient, no glow. */
+export function Logo({ href = "/" }: { href?: string }) {
   return (
     <Link className="logo" href={href} aria-label="Skylife Research home">
-      <span className="logo-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="16" height="16">
-          <path
-            d="M6 6L18 6M6 6L12 18M18 6L12 18"
-            stroke="#00e1ff"
-            strokeWidth="1"
-            opacity=".55"
-            fill="none"
-          />
-          <circle cx="6" cy="6" r="2" fill="#00e1ff" />
-          <circle cx="18" cy="6" r="2" fill="#35f0b5" />
-          <circle cx="12" cy="18" r="2" fill="#00e1ff" />
-        </svg>
-      </span>
+      <svg className="logo-mark" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+        <path d="M3 3 L15 3 L9 15 Z" stroke="rgba(255,255,255,.35)" strokeWidth="1" />
+        <rect x="1" y="1" width="4" height="4" fill="#e8eaed" />
+        <rect x="13" y="1" width="4" height="4" fill="#e8eaed" />
+        {/* NOT amber. Amber means "a live measured value"; a logo is not one. */}
+        <rect x="7" y="13" width="4" height="4" fill="#a8adb8" />
+      </svg>
       <span className="logo-text">
-        SKYLIFE <span className="dim">RESEARCH</span>
+        Skylife <span>Research</span>
       </span>
     </Link>
   );

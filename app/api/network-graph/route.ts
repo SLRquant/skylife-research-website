@@ -1,178 +1,121 @@
+/**
+ * GET /api/network-graph[?lookback=NN] — the real NIFTY-50 correlation network.
+ *
+ * Public, so the params are FIXED here and `lookback` is restricted to a WHITELIST: a visitor
+ * cannot use this to drive arbitrary (metered) queries against the upstream API. Each of the 8
+ * allowed values is cached for an hour independently.
+ *
+ * WHY LOOKBACK IS A REAL AXIS, AND WHY IT IS THE ONE WE EXPOSE
+ * ------------------------------------------------------------
+ * The upstream `include_graph` returns the edge list for the LATEST as-of date only (see its
+ * OpenAPI: "rolling: latest as-of date only") and there is no `asof`/`end_date` parameter. So a
+ * genuine sequence of graphs THROUGH TIME cannot be obtained from this API, and we will not
+ * invent one — a fabricated time axis on a quant site is exactly the lie the brand refuses.
+ *
+ * What IS real, and is recomputed by the engine from scratch on every call, is the ESTIMATION
+ * WINDOW: the number of trailing bars the correlation matrix is built from. Sweeping it produces
+ * genuinely different graphs of the same 49 names, and the differences are large and honest:
+ *
+ *     lookback  30 vs  60 :  62% of the edge union changes
+ *     lookback  60 vs 120 :  63%
+ *     lookback  30 vs 120 :  75%
+ *     most-central stock:  JIOFIN (30 bars) -> SHRIRAMFIN (60) -> BAJAJFINSV (120)
+ *
+ * That is the axis the morph engine scrubs. Displacement under it = how much of a stock's
+ * structural role is real, and how much is an artefact of the window you happened to pick.
+ */
 import { NextResponse } from "next/server";
-import { getApiBase, getApiToken } from "@/lib/upstream";
-import { sampleGraph } from "@/lib/sample-graph";
 
-export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
+export const revalidate = 3600;
+export const maxDuration = 60;
 
-type UpstreamEdge = {
-  source: string;
-  target: string;
-  weight: number;
-  community: number;
-};
+const BASE = process.env.GRAPH_STATS_API_BASE ?? "https://graph-api.skyliferesearch.com";
 
-type UpstreamPayload = Record<string, UpstreamEdge[]>;
-
-/** Cluster color palette — stable by community id. */
-const CLUSTER_COLORS = [
-  "#4dd4ac",
-  "#6ea8fe",
-  "#e879f9",
-  "#fbbf24",
-  "#fb7185",
-  "#818cf8",
-  "#34d399",
-  "#f97316",
-];
-
-const CLUSTER_LABELS: Record<number, string> = {
-  1: "FIN",
-  2: "IT",
-  3: "CON",
-  4: "ENE",
-  5: "PHA",
-  6: "AUTO",
-  7: "MAT",
-  8: "UTIL",
-};
-
-function pickLatestKey(payload: UpstreamPayload): string | null {
-  const keys = Object.keys(payload);
-  if (!keys.length) return null;
-  // Sort descending — keys look like nif50_centrality_20260424_0400
-  keys.sort((a, b) => (a > b ? -1 : a < b ? 1 : 0));
-  return keys[0];
-}
-
-function parseDateFromKey(key: string): string | undefined {
-  // nif50_centrality_YYYYMMDD_HHMM
-  const m = key.match(/(\d{8})_(\d{4})/);
-  if (!m) return undefined;
-  const [, d, t] = m;
-  return `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}T${t.slice(0, 2)}:${t.slice(2, 4)}:00Z`;
-}
-
-/** Transform upstream edge list into {nodes, edges, meta}. */
-function normalize(payload: UpstreamPayload) {
-  const key = pickLatestKey(payload);
-  if (!key) return null;
-  const rawEdges = payload[key];
-  if (!Array.isArray(rawEdges) || rawEdges.length === 0) return null;
-
-  // Derive nodes & compute degree centrality
-  const nodeMap = new Map<
-    string,
-    { id: string; symbol: string; cluster: number; degree: number; weightSum: number }
-  >();
-
-  for (const e of rawEdges) {
-    for (const sym of [e.source, e.target]) {
-      const existing = nodeMap.get(sym);
-      if (existing) {
-        existing.degree += 1;
-        existing.weightSum += e.weight;
-      } else {
-        nodeMap.set(sym, {
-          id: sym,
-          symbol: sym.replace(/-EQ$/, ""),
-          cluster: e.community ?? 0,
-          degree: 1,
-          weightSum: e.weight,
-        });
-      }
-    }
-  }
-
-  const maxDegree = Math.max(...Array.from(nodeMap.values()).map((n) => n.degree), 1);
-  const communities = new Set<number>();
-
-  const nodes = Array.from(nodeMap.values()).map((n) => {
-    communities.add(n.cluster);
-    return {
-      id: n.id,
-      symbol: n.symbol,
-      name: n.symbol,
-      cluster: n.cluster,
-      clusterLabel: CLUSTER_LABELS[n.cluster] ?? `C${n.cluster}`,
-      clusterColor: CLUSTER_COLORS[(n.cluster - 1 + CLUSTER_COLORS.length) % CLUSTER_COLORS.length],
-      centrality: n.degree / maxDegree,
-      momentum: 0,
-    };
-  });
-
-  // Prune to strongest edges per node so layout doesn't collapse (MST-ish)
-  // Keep edges above threshold OR top-K per node.
-  const TOP_PER_NODE = 4;
-  const adj = new Map<string, { e: UpstreamEdge; other: string }[]>();
-  for (const e of rawEdges) {
-    (adj.get(e.source) ?? adj.set(e.source, []).get(e.source)!).push({ e, other: e.target });
-    (adj.get(e.target) ?? adj.set(e.target, []).get(e.target)!).push({ e, other: e.source });
-  }
-  const keep = new Set<UpstreamEdge>();
-  for (const [, list] of adj) {
-    list.sort((a, b) => b.e.weight - a.e.weight);
-    for (let i = 0; i < Math.min(TOP_PER_NODE, list.length); i++) keep.add(list[i].e);
-  }
-  const edges = Array.from(keep).map((e) => ({
-    source: e.source,
-    target: e.target,
-    weight: e.weight,
-  }));
-
-  return {
-    nodes,
-    edges,
-    meta: {
-      universe: "NIFTY 50",
-      method: "Correlation network · Louvain communities",
-      lookbackDays: 60,
-      correlationThreshold: 0.5,
-      clustersDetected: communities.size,
-      asOf: parseDateFromKey(key),
-      fallback: false,
-    },
-  };
-}
+/** The only lookbacks a visitor may ask for. 8 cached variants, nothing else reaches upstream. */
+export const LOOKBACKS = [30, 40, 50, 60, 75, 90, 105, 120] as const;
+const DEFAULT_LOOKBACK = 60;
 
 export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const upstreamUrl = new URL(`${getApiBase()}/network-graph`);
-  searchParams.forEach((v, k) => upstreamUrl.searchParams.set(k, v));
+  const key = process.env.GRAPH_STATS_API_KEY;
 
-  const token = getApiToken();
-  const headers: Record<string, string> = {
-    Accept: "application/json",
-  };
-  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const asked = Number(new URL(req.url).searchParams.get("lookback"));
+  const lookback = (LOOKBACKS as readonly number[]).includes(asked) ? asked : DEFAULT_LOOKBACK;
+
+  const q = new URLSearchParams({
+    interval: "1d",
+    lookback: String(lookback),
+    periods: "1",
+    metrics: "eigenvector_centrality",
+    graph_method: "knn", // knn gives a richer, more readable web than an MST tree
+    knn_k: "4",
+    include_graph: "true",
+  });
 
   try {
-    const res = await fetch(upstreamUrl.toString(), {
-      headers,
-      next: { revalidate: 300 },
+    if (!key) throw new Error("GRAPH_STATS_API_KEY not set");
+
+    const res = await fetch(`${BASE}/v1/graph-stats/chart?${q}`, {
+      headers: { "x-api-key": key, Accept: "application/json" },
+      next: { revalidate },
+      signal: AbortSignal.timeout(45_000),
     });
     if (!res.ok) throw new Error(`upstream ${res.status}`);
-    const json = (await res.json()) as UpstreamPayload;
-    const normalized = normalize(json);
-    if (normalized) {
-      return NextResponse.json(normalized, {
-        status: 200,
-        headers: {
-          "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600",
-        },
-      });
-    }
-  } catch (err) {
-    console.error("[network-graph] upstream failed", err);
-  }
 
-  // Fallback
-  return NextResponse.json(
-    { ...sampleGraph, meta: { ...sampleGraph.meta, fallback: true } },
-    {
-      status: 200,
-      headers: {
-        "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300",
+    const body = await res.json();
+    if (!body?.success || body.data?.type !== "snapshot") throw new Error("bad payload");
+
+    const d = body.data;
+    const communities: Record<string, number> = d.graph.communities ?? {};
+
+    const cents = d.stocks.map((s: { eigenvector_centrality: number }) => s.eigenvector_centrality ?? 0);
+    const maxC = Math.max(...cents, 1e-9);
+
+    const nodes = d.stocks.map((s: { symbol: string; eigenvector_centrality: number | null }) => ({
+      id: s.symbol,
+      symbol: s.symbol,
+      name: s.symbol,
+      cluster: communities[s.symbol] ?? 0,
+      centrality: (s.eigenvector_centrality ?? 0) / maxC, // normalised -> drives node size
+      raw: s.eigenvector_centrality ?? 0,
+    }));
+
+    const edges = (d.graph.edge_list ?? []).map(
+      (e: { source: string; target: string; weight: number; corr?: number }) => ({
+        source: e.source,
+        target: e.target,
+        weight: e.weight,
+        corr: e.corr ?? e.weight,
+      })
+    );
+
+    return NextResponse.json(
+      {
+        nodes,
+        edges,
+        meta: {
+          universe: "NIFTY 50",
+          method: "knn k=4 · pearson · Louvain",
+          lookback,
+          interval: "1d",
+          clustersDetected: d.graph.n_communities ?? 0,
+          modularity: d.graph.modularity ?? undefined,
+          asOf: d.asof_date ?? undefined,
+          fallback: false,
+        },
       },
-    }
-  );
+      { headers: { "Cache-Control": `public, s-maxage=${revalidate}, stale-while-revalidate=86400` } }
+    );
+  } catch (e) {
+    // Surface the failure instead of quietly serving invented numbers as if they were real.
+    console.error("[network-graph] upstream failed", e instanceof Error ? e.message : e);
+    return NextResponse.json(
+      {
+        nodes: [],
+        edges: [],
+        meta: { universe: "NIFTY 50", lookback, fallback: true, error: "Live graph unavailable." },
+      },
+      { status: 200, headers: { "Cache-Control": "public, s-maxage=60" } }
+    );
+  }
 }

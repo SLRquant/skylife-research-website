@@ -1,56 +1,47 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Inter_Tight, IBM_Plex_Mono } from "next/font/google";
+import { Inter_Tight, Martian_Mono } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/lib/firebase/AuthProvider";
 
-const inter = Inter({
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-inter",
-  display: "swap",
-});
-
+/** Body. Weight capped at 500 — there is no 700 on this site. */
 const interTight = Inter_Tight({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500"],
   variable: "--font-inter-tight",
   display: "swap",
 });
 
-const plexMono = IBM_Plex_Mono({
+/**
+ * DISPLAY *and* DATA. Mono-as-display is the typographic signature: it says "this output was
+ * computed" before a single word is read. Martian Mono is variable on both `wght` and `wdth`,
+ * which is what lets headings physically EXPAND as they cross the viewport (globals.css .unfurl).
+ */
+const martianMono = Martian_Mono({
   subsets: ["latin"],
-  weight: ["400", "500", "600"],
-  variable: "--font-plex-mono",
+  // no `weight` => the variable font ships whole, which is what exposes `wdth` to the
+  // unfurl animation. Declaring weights would subset it to static instances.
+  axes: ["wdth"],
+  variable: "--font-display-mono",
   display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "Skylife Research — Trade the Hidden Network",
+  title: "Skylife Research — The market is not a list.",
   description:
-    "Daily community-detection signals on NIFTY500 — powered by graph theory and eigenvector centrality. Delivered as a feed, dashboard, or API.",
+    "Per-stock network centrality on the NIFTY-50, rebuilt from 1-minute bars. Watch the correlation graph re-form as you change the estimation window — and see how much of a stock's structural role is real.",
   openGraph: {
-    title: "Skylife Research — Trade the Hidden Network",
-    description:
-      "Graph-theory-powered quantitative research for the Indian stock market.",
+    title: "Skylife Research — The market is not a list.",
+    description: "Graph-theoretic market-structure research for the Indian stock market.",
     type: "website",
   },
-  icons: {
-    icon: "/favicon.svg",
-  },
+  icons: { icon: "/favicon.svg" },
 };
 
-export const viewport: Viewport = {
-  themeColor: "#05070d",
-};
+export const viewport: Viewport = { themeColor: "#0b0f19" };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html
-      lang="en"
-      className={`${inter.variable} ${interTight.variable} ${plexMono.variable} js-ready`}
-    >
+    <html lang="en" className={`${interTight.variable} ${martianMono.variable}`}>
       <body>
         <AuthProvider>{children}</AuthProvider>
       </body>

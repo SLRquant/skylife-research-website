@@ -6,9 +6,15 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useState } from "react";
-import { getFirebaseAuth, isFirebaseConfigured } from "@/lib/firebase/client";
+import {
+  getFirebaseAuth,
+  isFirebaseConfigured,
+  signInWithGoogle,
+} from "@/lib/firebase/client";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { Navbar } from "@/components/Navbar";
+import { Plate } from "@/components/Plate";
+import { GoogleButton } from "@/components/GoogleButton";
 
 const schema = z.object({
   email: z.email("Enter a valid email"),
@@ -45,20 +51,30 @@ export default function SignUpPage() {
 
   return (
     <>
-      <div className="grid-bg" aria-hidden="true" />
-      <div className="glow" aria-hidden="true" />
+      <Plate />
       <Navbar />
       <main className="auth-wrap">
         <div className="auth-card">
           <h1>Create account</h1>
           <p className="sub">Seven-day trial. No credit card.</p>
+
+          <GoogleButton
+            label="Sign up with Google"
+            onClick={async () => {
+              await signInWithGoogle();
+              router.replace("/dashboard");
+            }}
+            onError={setErr}
+          />
+          <div className="auth-divider"><span>or</span></div>
+
           <form
-            className="contact-form"
+            
             onSubmit={handleSubmit(onSubmit)}
             noValidate
           >
-            <label>
-              <span>Email</span>
+            <label className="field">
+              <span className="label">Email</span>
               <input
                 type="email"
                 autoComplete="email"
@@ -68,8 +84,8 @@ export default function SignUpPage() {
             {errors.email && (
               <span className="form-err">{errors.email.message}</span>
             )}
-            <label>
-              <span>Password</span>
+            <label className="field">
+              <span className="label">Password</span>
               <input
                 type="password"
                 autoComplete="new-password"
