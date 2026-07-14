@@ -10,6 +10,7 @@ import { useAuth } from "@/lib/firebase/AuthProvider";
 import { Leaderboard } from "@/components/graph-stats/Leaderboard";
 import { TimeSeriesChart } from "@/components/graph-stats/TimeSeriesChart";
 import { GraphCanvas } from "@/components/GraphCanvas";
+import { Def, DefList, InfoBox } from "@/components/InfoBox";
 import { buildClusterScale } from "@/components/graph-stats/colors";
 import type { LatestGraph, RollingData, Series } from "@/lib/graph-stats";
 import {
@@ -141,6 +142,20 @@ export function GraphStatsTool() {
       })
       .catch(() => {});
   }, [user]);
+
+  /**
+   * A tier with a fixed metric set doesn't get to pick. Force the state to that exact set the
+   * moment the tier lands, so the form can never submit something the server will reject — the
+   * chips and validateForTier() read the SAME `limits.fixedMetrics`, so they cannot disagree.
+   */
+  const metricsLocked = limits.fixedMetrics !== null;
+  useEffect(() => {
+    const fixed = limits.fixedMetrics;
+    if (!fixed) return;
+    setMetrics((cur) =>
+      cur.length === fixed.length && fixed.every((m) => cur.includes(m)) ? cur : [...fixed]
+    );
+  }, [limits]);
 
   const allows = <T extends string>(list: readonly T[], v: string) =>
     (list as readonly string[]).includes(v);
@@ -345,6 +360,60 @@ export function GraphStatsTool() {
               </div>
             )}
 
+            <InfoBox title="What these metrics mean">
+              <DefList>
+                <Def term="The graph">
+                  For each trading day we take the trailing window of returns, correlate every pair
+                  of stocks, and keep only the strongest links. That gives one{" "}
+                  <strong>network of the market</strong> per day. Every number below describes a
+                  stock&rsquo;s <strong>position in that network</strong> — not its price, not its
+                  return.
+                </Def>
+                <Def term="Eigenvector">
+                  <strong>Influence via influential peers.</strong> 0 to 1. Being connected to many
+                  stocks scores well; being connected to <em>central</em> stocks scores far better.
+                  The highest score is the market&rsquo;s main hub — a shock there travels
+                  furthest. Typically <em>0.2–0.5</em> for the top names.
+                </Def>
+                <Def term="PageRank">
+                  <strong>Where a random walk ends up.</strong> Set something loose on the network
+                  and let it wander along the links; PageRank is the share of time it spends on each
+                  stock. Similar in spirit to Eigenvector, but kinder to well-connected names
+                  outside the core. Sums to 1 across all stocks, so values are small —{" "}
+                  <em>~0.02</em> is average in a 49-stock universe.
+                </Def>
+                <Def term="Degree">
+                  <strong>Raw connectedness.</strong> Add up the correlation strength of every link
+                  a stock has. Blunt but honest: it counts the crowd, and doesn&rsquo;t care whether
+                  the crowd matters.
+                </Def>
+                <Def term="Betweenness">
+                  <strong>The bridge.</strong> How often a stock sits on the shortest path between
+                  two others. A high score means it <em>connects otherwise separate parts of the
+                  market</em> — it may be small, yet removing it would split the network in two.
+                  Most stocks score near <em>0</em>; a handful score high. That skew is the signal.
+                </Def>
+                <Def term="Closeness">
+                  <strong>Reach.</strong> The inverse of the average distance to every other stock.
+                  High = news reaches it quickly from anywhere; low = it sits out on the rim.
+                </Def>
+                <Def term="Latest / Δ">
+                  <strong>Latest</strong> is the metric on the most recent day. <strong>Δ</strong>{" "}
+                  is how much it changed across the whole period — the number that tells you a
+                  stock is <em>becoming</em> a hub rather than already being one.
+                </Def>
+                <Def term="Rank">
+                  Its standing among all stocks on the latest day, 1 = most central. The arrow shows
+                  how many places it climbed or fell.
+                </Def>
+                <Def term="Q">
+                  <strong>Modularity</strong>, 0 to 1 — how cleanly the market splits into blocs on
+                  that day. <em>Above 0.3</em> is real structure; <em>0.4–0.7</em> is a strongly
+                  clustered market.
+                </Def>
+              </DefList>
+            </InfoBox>
+
             {/* ---- params ---- */}
             <section className="panel panel-body" style={blocked ? { opacity: 0.35, pointerEvents: "none" } : undefined}>
               <div className="gs-params-grid">
@@ -447,14 +516,23 @@ export function GraphStatsTool() {
                   <button
                     key={m.id}
                     type="button"
-                    title={m.hint}
-                    className={`key${metrics.includes(m.id) ? " on" : ""}`}
-                    onClick={() => toggleMetric(m.id)}
+                    title={metricsLocked ? "Included on your plan — not adjustable" : m.hint}
+                    className={`key${metrics.includes(m.id) ? " on" : ""}${metricsLocked ? " is-locked" : ""}`}
+                    aria-disabled={metricsLocked}
+                    onClick={() => !metricsLocked && toggleMetric(m.id)}
                   >
                     {m.label}
                   </button>
                 ))}
-                <FieldErr msg={errs.metrics} />
+                {metricsLocked ? (
+                  // Every chip is ON and none can be turned off — so say why, once, instead of
+                  // letting five dead buttons imply the page is broken.
+                  <span className="gs-hint" style={{ flexBasis: "100%" }}>
+                    All five metrics are computed on {limits.label}. Upgrade to choose which to run.
+                  </span>
+                ) : (
+                  <FieldErr msg={errs.metrics} />
+                )}
               </div>
 
               <div className="gs-actions">

@@ -16,7 +16,8 @@ type Sim = GNode & {
   s: number;              // radius, world units
   px?: number; py?: number; // anchor target = position at the previous step
   stability: number;      // 0..1 — 1 = structural role unchanged
-  drift: number;          // world-units moved by the last morph (this is the INFORMATION)
+  drift: number;          // world-units moved by the last morph — a LAYOUT quantity, not a market one
+  dcent: number;          // |Δ centrality| across the window change — the real, reportable number
   fixed?: boolean;
 };
 
@@ -98,7 +99,7 @@ function chaikin(pts: Array<[number, number]>, iters = 2): Array<[number, number
 
 /* ------------------------------------------------------------------ */
 
-export type GraphCanvasHandle = { drift: Array<{ symbol: string; drift: number; stability: number }> };
+export type GraphCanvasHandle = { drift: Array<{ symbol: string; drift: number; stability: number; dcent: number }> };
 
 export function GraphCanvas({
   nodes,
@@ -114,7 +115,7 @@ export function GraphCanvas({
   onSelect: (id: string | null) => void;
   height?: number;
   /** Reports how far each node MIGRATED on the last morph. Displacement is information. */
-  onDrift?: (rows: Array<{ symbol: string; drift: number; stability: number }>) => void;
+  onDrift?: (rows: Array<{ symbol: string; drift: number; stability: number; dcent: number }>) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -279,6 +280,10 @@ export function GraphCanvas({
         py: p?.y,
         stability: isMorph ? stability : 1,
         drift: 0,
+        // The RAW |Δcentrality|, not the normalised one. `stability` divides by the round's biggest
+        // mover, which makes it relative to whoever else happened to move; this is the absolute
+        // change, on the same 0..1 scale as the centrality shown everywhere else on the page.
+        dcent: isMorph ? (deltas.get(n.id) ?? 0) : 0,
       };
     });
 
@@ -564,10 +569,10 @@ export function GraphCanvas({
           alphaRef.current = 0;
           // the morph is over — record how far everything actually moved
           if (morphRef.current) {
-            const rows: Array<{ symbol: string; drift: number; stability: number }> = [];
+            const rows: Array<{ symbol: string; drift: number; stability: number; dcent: number }> = [];
             for (const n of simRef.current) {
               if (n.px != null && n.py != null) n.drift = Math.hypot(n.x - n.px, n.y - n.py);
-              rows.push({ symbol: n.symbol, drift: n.drift, stability: n.stability });
+              rows.push({ symbol: n.symbol, drift: n.drift, stability: n.stability, dcent: n.dcent });
             }
             onDrift?.(rows.sort((p, q) => q.drift - p.drift));
           }

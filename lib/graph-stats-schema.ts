@@ -26,6 +26,7 @@ export const ALL_GRAPH_METHODS = ["mst", "knn", "threshold", "complete"] as cons
 
 export type Interval = (typeof ALL_INTERVALS)[number];
 export type GraphMethod = (typeof ALL_GRAPH_METHODS)[number];
+export type Metric = (typeof METRICS)[number];
 /** True for intraday bars — these need a TIME on the axis, not just a date. */
 export function isIntraday(i: string): boolean {
   return i !== "1d";
@@ -48,7 +49,30 @@ export type TierLimits = {
   symbolsMax: number;
   /** null = unlimited runs */
   runs: number | null;
+  /**
+   * `null` = the user picks any subset of METRICS.
+   * A list = the metric set is FIXED. The form locks the chips and the server rejects anything
+   * else, so the two cannot drift apart.
+   */
+  fixedMetrics: readonly Metric[] | null;
 };
+
+/**
+ * The metric set a free user always gets. Fixed, not chosen.
+ *
+ * Choosing metrics is a power-user act — it presumes you already know what Betweenness is and why
+ * you'd want it without Closeness. A first-time visitor doesn't, and a half-picked set makes the
+ * tool look broken rather than restrained. So free runs the whole panel: all five, every time, no
+ * decision to get wrong. (Cost isn't the constraint — all 5 metrics over the full universe were
+ * measured at ~9s; the engine barely notices.)
+ */
+export const FREE_METRICS = [
+  "eigenvector_centrality",
+  "pagerank",
+  "degree_strength",
+  "betweenness_centrality",
+  "closeness_centrality",
+] as const satisfies readonly Metric[];
 
 export const TIERS: Record<Tier, TierLimits> = {
   free: {
@@ -59,6 +83,7 @@ export const TIERS: Record<Tier, TierLimits> = {
     periodsMax: 30,
     symbolsMax: 50,
     runs: Number(process.env.NEXT_PUBLIC_GRAPH_STATS_FREE_LIMIT ?? 5),
+    fixedMetrics: FREE_METRICS,
   },
   paid: {
     label: "Paid",
@@ -70,6 +95,7 @@ export const TIERS: Record<Tier, TierLimits> = {
     periodsMax: 30,
     symbolsMax: 50,
     runs: null,
+    fixedMetrics: null,   // paid chooses freely
   },
 };
 
@@ -157,6 +183,21 @@ export function validateForTier(p: Params, tier: Tier): TierIssue[] {
       message: `The "${p.graph_method}" method isn't available on ${t.label}. Included: ${t.graphMethods.join(", ")}.`,
       upgrade: true,
     });
+  }
+
+  // A fixed metric set means EXACTLY that set — not a subset, not a superset. Enforced here so a
+  // hand-crafted request can't quietly pick its own; the form's locked chips are only the UI half.
+  if (t.fixedMetrics) {
+    const want = new Set<string>(t.fixedMetrics);
+    const got = new Set<string>(p.metrics);
+    const same = want.size === got.size && [...want].every((m) => got.has(m));
+    if (!same) {
+      issues.push({
+        path: ["metrics"],
+        message: `${t.label} runs a fixed set of metrics and they can't be changed. Upgrade to choose which to compute.`,
+        upgrade: true,
+      });
+    }
   }
 
   if (p.lookback > t.lookbackMax) {
