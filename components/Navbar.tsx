@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Logo } from "./Logo";
-import { MarketStatus } from "./MarketStatus";
 import { useAuth } from "@/lib/firebase/AuthProvider";
 
 export function Navbar() {
@@ -34,7 +33,6 @@ export function Navbar() {
         </nav>
 
         <div className="nav-right">
-          <MarketStatus />
           <Link className="btn btn-ghost" href={user ? "/dashboard" : "/auth/sign-in"}>
             {user ? "Dashboard" : "Sign in"}
           </Link>

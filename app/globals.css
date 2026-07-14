@@ -243,15 +243,6 @@ p { margin: 0; text-wrap: pretty; }
 .nav-toggle { display: none; width: 32px; height: 32px; border: 1px solid var(--rule-2); }
 .nav-toggle span { display: block; width: 14px; height: 1px; background: var(--text); margin: 3px auto; }
 
-.status {
-  display: inline-flex; align-items: center; gap: var(--space-2);
-  font-family: var(--font-mono); font-size: var(--text-2xs);
-  letter-spacing: .12em; color: var(--label);
-  border: 1px solid var(--rule-2); padding: var(--space-1) var(--space-2);
-}
-.status .led { width: 5px; height: 5px; border-radius: 50%; background: var(--label); }
-.status .led.on { background: var(--up); }
-
 /* ---------- data-as-ornament: the lab-notebook margin ---------- */
 .gutter {
   position: fixed; left: 0; top: 0; bottom: 0; width: var(--space-4);
@@ -667,7 +658,10 @@ a.schema-cell:hover { background: var(--ink-800); }
   .nav-links.open { display: flex; }
   .nav-links a { padding: var(--space-3) 0; border-bottom: 1px solid var(--rule-1); }
   .nav-toggle { display: block; }
-  .nav-right .btn, .status { display: none; }
+  /* The Sign in / Dashboard button STAYS on mobile. It used to be hidden here, and because the
+     hamburger menu never contained a sign-in link either, a phone user had no way to reach the
+     product at all. Dropping the NSE badge frees exactly the width this needs. */
+  .nav-right .btn { padding: var(--space-1) var(--space-2); font-size: var(--text-2xs); }
   .sec-head { grid-template-columns: 1fr; }
   .schema, .coverage, .faq, .contact, .foot-top { grid-template-columns: 1fr; }
   .schema-cell { border-left: 1px solid var(--rule-1); }
