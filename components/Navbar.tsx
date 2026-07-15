@@ -5,6 +5,9 @@ import Link from "next/link";
 import { Logo } from "./Logo";
 import { useAuth } from "@/lib/firebase/AuthProvider";
 
+/** The developer documentation portal (ReadMe). Swap for the custom domain once it's set up. */
+const DOCS_URL = "https://skylife-research.readme.io";
+
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
@@ -29,6 +32,10 @@ export function Navbar() {
           <Link href="/network-graph" onClick={close}>Network</Link>
           <Link href="/#methodology" onClick={close}>Method</Link>
           <Link href="/#pricing" onClick={close}>Spec</Link>
+          {/* Developer docs live on ReadMe — a separate host, so open in a new tab. */}
+          <a href={DOCS_URL} target="_blank" rel="noopener noreferrer" onClick={close}>
+            Docs ↗
+          </a>
           <Link href="/#contact" onClick={close}>Contact</Link>
         </nav>
 
