@@ -50,6 +50,9 @@ export default function DashboardPage() {
                 <Link className="btn btn-primary" href="/dashboard/graph-stats">
                   Open Graph Stats →
                 </Link>
+                <Link className="btn btn-ghost" href="/dashboard/api">
+                  API access →
+                </Link>
                 <button
                   className="btn btn-ghost"
                   onClick={handleSignOut}
