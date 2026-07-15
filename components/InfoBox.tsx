@@ -1,14 +1,12 @@
 /**
- * A collapsed-by-default legend. Native <details>, so it costs no JS, is keyboard-operable, and
- * is searchable by the browser's find-in-page even while closed in modern engines.
+ * An always-open legend. A static block, not a <details> disclosure — the definitions stay
+ * visible at all times.
  *
- * It is collapsed on purpose. The page's job is to show the market's structure; a permanent wall
- * of definitions would compete with the thing it is explaining. But a reader who meets `Q 0.441`
- * or `44u` and has no idea what they are looking at is not going to trust the tool — so the
- * answer has to be one click away, never a search.
+ * Rationale: a reader who meets `Q 0.441` or `Betweenness` and can't decode it won't trust the
+ * tool. Hiding the key behind a click assumes they already know they need it; a first-time visitor
+ * doesn't. So it is always on screen, styled quietly enough that a returning user's eye skips past
+ * it.
  */
-"use client";
-
 import type { ReactNode } from "react";
 
 export function InfoBox({
@@ -19,16 +17,15 @@ export function InfoBox({
   children: ReactNode;
 }) {
   return (
-    <details className="infobox">
-      <summary>
+    <section className="infobox" aria-label={title}>
+      <div className="infobox-head">
         <span className="infobox-mark" aria-hidden="true">
           i
         </span>
         <span className="label">{title}</span>
-        <span className="infobox-chev" aria-hidden="true" />
-      </summary>
+      </div>
       <div className="infobox-body">{children}</div>
-    </details>
+    </section>
   );
 }
 

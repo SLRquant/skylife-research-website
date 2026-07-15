@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Plate } from "@/components/Plate";
@@ -9,6 +9,16 @@ import { buildClusterScale } from "@/components/graph-stats/colors";
 import { Def, DefList, InfoBox } from "@/components/InfoBox";
 
 const LOOKBACKS = [30, 40, 50, 60, 75, 90, 105, 120];
+
+/** The centrality columns shown in the inspector, in reading order. Keys match the API. */
+const METRIC_COLS = [
+  { key: "eigenvector_centrality", label: "Eigenvector", short: "Eig" },
+  { key: "pagerank", label: "PageRank", short: "PR" },
+  { key: "degree_strength", label: "Degree", short: "Deg" },
+  { key: "betweenness_centrality", label: "Betweenness", short: "Btw" },
+  { key: "closeness_centrality", label: "Closeness", short: "Cls" },
+] as const;
+type MetricKey = (typeof METRIC_COLS)[number]["key"];
 
 type Meta = {
   universe?: string;
@@ -19,7 +29,11 @@ type Meta = {
   asOf?: string;
   fallback?: boolean;
 };
-type Node = GNode & { name?: string; raw?: number };
+type Node = GNode & {
+  name?: string;
+  raw?: number;
+  metrics?: Record<MetricKey, number | null>;
+};
 type Payload = { nodes: Node[]; edges: GEdge[]; meta: Meta };
 
 export function NetworkGraphTool() {
@@ -28,9 +42,6 @@ export function NetworkGraphTool() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<string | null>(null);
-  const [drift, setDrift] = useState<
-    Array<{ symbol: string; drift: number; stability: number; dcent: number }>
-  >([]);
   const cache = useRef<Map<number, Payload>>(new Map());
 
   const lookback = LOOKBACKS[idx];
@@ -58,12 +69,6 @@ export function NetworkGraphTool() {
     return () => { abort = true; };
   }, [lookback]);
 
-  const onDrift = useCallback(
-    (rows: Array<{ symbol: string; drift: number; stability: number; dcent: number }>) =>
-      setDrift(rows),
-    []
-  );
-
   const scale = useMemo(
     () => buildClusterScale(data?.nodes.map((n) => n.cluster) ?? []),
     [data]
@@ -84,17 +89,36 @@ export function NetworkGraphTool() {
     return out.sort((a, b) => b.w - a.w).slice(0, 8);
   }, [data, node]);
 
-  // Rank by Δcentrality, the quantity actually displayed — NOT by layout drift. They disagree:
-  // a node can slide a long way across the canvas because its neighbours moved, while its own
-  // role barely changed. Sorting by one and printing the other produced a column that read
-  // 0.2216, 0.0142, 0.0384 under a heading that said "migrated most", which is nonsense.
-  const migrants = [...drift]
-    .filter((d) => d.dcent > 1e-6)
-    .sort((a, b) => b.dcent - a.dcent)
-    .slice(0, 6);
-  const maxDcent = migrants[0]?.dcent ?? 1;
-  // "Held position" = the names whose role genuinely didn't move, i.e. smallest Δcentrality.
-  const anchored = [...drift].sort((a, b) => a.dcent - b.dcent).slice(0, 3);
+  /**
+   * Per-metric ranks and column maxima, computed once per payload. Ranks let the inspector say
+   * "3rd of 49 on Betweenness"; the maxima drive the little bars. A stock's role is only legible
+   * relative to the others, so both are cross-sectional.
+   */
+  const stats = useMemo(() => {
+    const nodes = data?.nodes ?? [];
+    const rank: Record<string, Map<string, number>> = {};
+    const max: Record<string, number> = {};
+    for (const { key } of METRIC_COLS) {
+      const vals = nodes
+        .map((n) => ({ sym: n.symbol, v: n.metrics?.[key] ?? -Infinity }))
+        .sort((a, b) => b.v - a.v);
+      rank[key] = new Map(vals.map((x, i) => [x.sym, i + 1]));
+      max[key] = Math.max(...nodes.map((n) => n.metrics?.[key] ?? 0), 1e-9);
+    }
+    return { rank, max, n: nodes.length };
+  }, [data]);
+
+  /** All stocks, sorted by eigenvector centrality — the default full-width table. */
+  const ranked = useMemo(
+    () =>
+      [...(data?.nodes ?? [])].sort(
+        (a, b) => (b.metrics?.eigenvector_centrality ?? 0) - (a.metrics?.eigenvector_centrality ?? 0)
+      ),
+    [data]
+  );
+
+  const val = (n: Node | null, k: MetricKey) => n?.metrics?.[k] ?? null;
+  const fmt = (v: number | null) => (v == null ? "—" : v.toFixed(4));
 
   return (
     <>
@@ -157,14 +181,13 @@ export function NetworkGraphTool() {
                 correlations are measured over. Drag it and the graph re-solves. This is the honest
                 part — a structure that only exists at one window setting was never really there.
               </Def>
-              <Def term="Δ centrality">
-                How much a stock&rsquo;s centrality <strong>changed</strong> when you last moved the
-                window, on that same 0–1 scale. Big number = its role was an artefact of the window
-                you happened to pick. Small number = the role is real. The names under{" "}
-                <em>held position</em> barely moved at all.
+              <Def term="The table">
+                Below the graph, every stock scored <strong>five ways</strong> (see the legend under
+                it), with its rank on each. Click any row — or any node — to open that stock on its
+                own.
               </Def>
               <Def term="Strongest edges">
-                Click any stock. These are its <strong>correlations</strong> (|ρ|, 0 to 1) with its
+                Inside a selected stock, its <strong>correlations</strong> (|ρ|, 0 to 1) with its
                 nearest neighbours. <em>0.82</em> is a very tight co-movement; <em>0.30</em> is
                 loose.
               </Def>
@@ -195,7 +218,6 @@ export function NetworkGraphTool() {
                 edges={data.edges}
                 selected={selected}
                 onSelect={setSelected}
-                onDrift={onDrift}
                 height={620}
               />
             ) : (
@@ -229,61 +251,51 @@ export function NetworkGraphTool() {
             </div>
           </div>
 
-          {/* ---- the morph's own output. Displacement IS the information. ---- */}
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginTop: "var(--space-4)" }}>
-            <div className="panel">
-              <div className="panel-head">
-                <span className="label">Migrated most on the last window change</span>
-                <span className="label">Δ centrality</span>
-              </div>
-              <div className="panel-body">
-                {migrants.length ? (
-                  <div className="drift">
-                    {migrants.map((m) => (
-                      <div key={m.symbol} className="drift-row">
-                        <span>{m.symbol}</span>
-                        {/* Was `44u` — world-units the dot slid across the canvas. That is a
-                            property of the LAYOUT (canvas size, force constants), not of the
-                            market, and it was the one number on this page that meant nothing.
-                            This is the real, reportable quantity: how much the stock's
-                            eigenvector centrality actually changed, on the same 0..1 scale as
-                            every other centrality shown here. */}
-                        <span className="sig">{m.dcent.toFixed(4)}</span>
-                        <span className="drift-bar">
-                          <i style={{ width: `${Math.min(100, (m.dcent / maxDcent) * 100)}%` }} />
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="label">Move the window dial to measure displacement.</p>
-                )}
-                {anchored.length > 0 && (
-                  <p className="label" style={{ marginTop: "var(--space-3)" }}>
-                    Held position: {anchored.map((a) => a.symbol).join(" · ")}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            <div className="panel">
-              <div className="panel-head">
-                <span className="label">{node ? node.symbol : "Communities"}</span>
-                <span className="label">
-                  {node ? scale.label(node.cluster) : `${data?.meta.clustersDetected ?? "—"} detected`}
-                </span>
-              </div>
-              <div className="panel-body">
+          {/* ---- full-width inspector: every stock's position, measured five ways ---- */}
+          <section className="panel" style={{ marginTop: "var(--space-4)" }}>
+            <div className="panel-head">
+              <span className="label">
                 {node ? (
                   <>
-                    <div className="drift-row" style={{ borderBottom: "1px solid var(--rule-3)" }}>
-                      <span className="label">Eigenvector centrality</span>
-                      <span className="sig">{(node.raw ?? node.centrality).toFixed(4)}</span>
-                      <span />
-                    </div>
-                    <p className="label" style={{ margin: "var(--space-3) 0 var(--space-2)" }}>
-                      Strongest edges
-                    </p>
+                    {node.symbol} · <span className="sig">{scale.label(node.cluster)}</span>
+                  </>
+                ) : (
+                  "Centrality — every stock, five ways"
+                )}
+              </span>
+              <span className="label">
+                {node ? "one stock" : `${stats.n} names · ranked by eigenvector`}
+              </span>
+            </div>
+
+            <div className="panel-body">
+              {node ? (
+                /* ---- one stock, in depth ---- */
+                <>
+                  <div className="ng-metric-grid">
+                    {METRIC_COLS.map((col) => {
+                      const v = val(node, col.key);
+                      const r = stats.rank[col.key]?.get(node.symbol);
+                      const w = v == null ? 0 : Math.min(100, (v / stats.max[col.key]) * 100);
+                      return (
+                        <div key={col.key} className="ng-metric">
+                          <span className="label">{col.label}</span>
+                          <span className="ng-metric-val sig">{fmt(v)}</span>
+                          <span className="ng-metric-rank">
+                            #{r ?? "—"} of {stats.n}
+                          </span>
+                          <span className="drift-bar">
+                            <i style={{ width: `${w}%` }} />
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <p className="label" style={{ margin: "var(--space-4) 0 var(--space-2)" }}>
+                    Strongest edges · |ρ| to nearest neighbours
+                  </p>
+                  <div className="ng-edges">
                     {neighbours.map((x) => (
                       <div key={x.n.id} className="drift-row">
                         <span>
@@ -296,64 +308,126 @@ export function NetworkGraphTool() {
                         </span>
                       </div>
                     ))}
-                    <button className="btn btn-ghost" style={{ marginTop: "var(--space-3)" }} onClick={() => setSelected(null)}>
-                      Clear
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    {scale.ranked.map((c) => {
-                      const members = data?.nodes.filter((n) => n.cluster === c) ?? [];
-                      const lead = [...members].sort((a, b) => b.centrality - a.centrality)[0];
-                      return (
-                        <div key={c} className="drift-row">
-                          <span>
-                            <span className="gs-dot" style={{ background: scale.color(c) }} />
-                            {scale.label(c)} · {members.length} names
-                          </span>
-                          <span>{lead?.symbol ?? "—"}</span>
-                          <span className="sig" style={{ textAlign: "right" }}>
-                            {(lead?.raw ?? lead?.centrality ?? 0).toFixed(3)}
-                          </span>
-                        </div>
-                      );
-                    })}
-                    <InfoBox title="How to read this list">
-                      <DefList>
-                        <Def term="C1 … C6">
-                          A <strong>community</strong> — a bloc of stocks the algorithm found moving
-                          together. Numbered largest-first, so <em>C1</em> is always the biggest.
-                          Nobody labels these &ldquo;banks&rdquo; or &ldquo;IT&rdquo;; Louvain finds
-                          them from returns alone. They shift as the market does.
-                        </Def>
-                        <Def term="N names">
-                          How many stocks are in that bloc.
-                        </Def>
-                        <Def term="Leader">
-                          Its <strong>most central</strong> member — the stock the rest of the bloc
-                          moves around.
-                        </Def>
-                        <Def term="0.448">
-                          That leader&rsquo;s <strong>eigenvector centrality</strong>, 0 to 1. The
-                          higher it is, the more the bloc revolves around one name rather than
-                          being evenly connected.
-                        </Def>
-                      </DefList>
-                    </InfoBox>
-                    {scale.merged && (
-                      <p className="label" style={{ marginTop: "var(--space-3)" }}>
-                        Smaller communities are merged into OTHER — six is the most that can be
-                        told apart by colour alone on a dark surface.
-                      </p>
-                    )}
-                    <p className="label" style={{ marginTop: "var(--space-3)" }}>
-                      Click a node to inspect it. Hover to trace its neighbourhood hop by hop.
-                    </p>
-                  </>
-                )}
-              </div>
+                  </div>
+
+                  <button
+                    className="btn btn-ghost"
+                    style={{ marginTop: "var(--space-4)" }}
+                    onClick={() => setSelected(null)}
+                  >
+                    ← All stocks
+                  </button>
+                </>
+              ) : (
+                /* ---- the whole universe, sortable at a glance, click to drill in ---- */
+                <div className="ng-table-wrap">
+                  <table className="ng-table">
+                    <thead>
+                      <tr>
+                        <th className="ng-num">#</th>
+                        <th>Stock</th>
+                        <th>Cmty</th>
+                        {METRIC_COLS.map((c) => (
+                          <th key={c.key} className="ng-num" title={c.label}>
+                            {c.label}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ranked.map((n, i) => (
+                        <tr key={n.id} className="ng-row" onClick={() => setSelected(n.id)}>
+                          <td className="ng-num dim">{i + 1}</td>
+                          <td className="ng-sym">
+                            <span className="gs-dot" style={{ background: scale.color(n.cluster) }} />
+                            {n.symbol}
+                          </td>
+                          <td className="dim">{scale.label(n.cluster)}</td>
+                          {METRIC_COLS.map((c) => (
+                            <td key={c.key} className="ng-num sig">
+                              {fmt(val(n, c.key))}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <p className="label" style={{ padding: "var(--space-3)" }}>
+                    Click any row to inspect that stock. Or click a node in the graph above.
+                  </p>
+                </div>
+              )}
             </div>
-          </div>
+          </section>
+
+          <InfoBox title="The five centrality measures">
+            <DefList>
+              <Def term="Eigenvector">
+                <strong>Influence via influential peers.</strong> 0 to 1. Being linked to many
+                stocks scores well; being linked to <em>central</em> ones scores far better. The
+                top score is the market&rsquo;s main hub — a shock there travels furthest. This is
+                also what sizes the nodes in the graph.
+              </Def>
+              <Def term="PageRank">
+                <strong>Where a random walk settles.</strong> Set something loose on the network and
+                let it wander the links; PageRank is the share of time spent on each stock. Kinder
+                than Eigenvector to well-connected names outside the core. Sums to 1 across all
+                stocks, so values are small — <em>~0.02</em> is average here.
+              </Def>
+              <Def term="Degree">
+                <strong>Raw connectedness.</strong> The summed correlation strength of every link a
+                stock has. Blunt but honest: it counts the crowd, and doesn&rsquo;t weigh whether
+                the crowd matters.
+              </Def>
+              <Def term="Betweenness">
+                <strong>The bridge.</strong> How often a stock sits on the shortest path between two
+                others. High = it <em>connects otherwise separate parts</em> of the market; it may
+                be small, yet removing it would split the network. Most names score near{" "}
+                <em>0</em> — that skew is the signal.
+              </Def>
+              <Def term="Closeness">
+                <strong>Reach.</strong> The inverse of the average distance to every other stock.
+                High = news reaches it quickly from anywhere; low = it sits out on the rim.
+              </Def>
+              <Def term="# of 49">
+                Each stock&rsquo;s <strong>rank</strong> on that measure across the whole universe,
+                1 = most central. A name can top one measure and sit mid-table on another — that
+                disagreement is often the interesting part.
+              </Def>
+            </DefList>
+          </InfoBox>
+
+          {/* ---- communities, kept as its own strip ---- */}
+          <section className="panel" style={{ marginTop: "var(--space-4)" }}>
+            <div className="panel-head">
+              <span className="label">Communities</span>
+              <span className="label">{data?.meta.clustersDetected ?? "—"} detected</span>
+            </div>
+            <div className="panel-body">
+              {scale.ranked.map((c) => {
+                const members = data?.nodes.filter((n) => n.cluster === c) ?? [];
+                const lead = [...members].sort((a, b) => b.centrality - a.centrality)[0];
+                return (
+                  <div key={c} className="drift-row">
+                    <span>
+                      <span className="gs-dot" style={{ background: scale.color(c) }} />
+                      {scale.label(c)} · {members.length} names
+                    </span>
+                    <span>{lead?.symbol ?? "—"}</span>
+                    <span className="sig" style={{ textAlign: "right" }}>
+                      {(lead?.raw ?? lead?.centrality ?? 0).toFixed(3)}
+                    </span>
+                  </div>
+                );
+              })}
+              {scale.merged && (
+                <p className="label" style={{ marginTop: "var(--space-3)" }}>
+                  Smaller communities are merged into OTHER — six is the most that can be told apart
+                  by colour alone on a dark surface.
+                </p>
+              )}
+            </div>
+          </section>
         </div>
       </main>
     </>

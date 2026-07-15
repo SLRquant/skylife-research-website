@@ -64,7 +64,11 @@ export async function GET(req: Request) {
     interval: "1d",
     lookback: String(lookback),
     periods: "1",
-    metrics: "eigenvector_centrality",
+    // All five centrality measures, not just eigenvector. The graph is sized by eigenvector, but
+    // the inspector table below it reports the full set — and at 49 nodes / periods=1 the extra
+    // four cost nothing (measured ~1.5s total). The homepage hero uses only `centrality` and
+    // ignores the rest, so this doesn't affect it.
+    metrics: "eigenvector_centrality,pagerank,degree_strength,betweenness_centrality,closeness_centrality",
     graph_method: "knn", // knn gives a richer, more readable web than an MST tree
     knn_k: "4",
     include_graph: "true",
@@ -112,13 +116,29 @@ export async function GET(req: Request) {
     const cents = d.stocks.map((s: { eigenvector_centrality: number }) => s.eigenvector_centrality ?? 0);
     const maxC = Math.max(...cents, 1e-9);
 
-    const nodes = d.stocks.map((s: { symbol: string; eigenvector_centrality: number | null }) => ({
+    type Stock = {
+      symbol: string;
+      eigenvector_centrality: number | null;
+      pagerank: number | null;
+      degree_strength: number | null;
+      betweenness_centrality: number | null;
+      closeness_centrality: number | null;
+    };
+    const nodes = (d.stocks as Stock[]).map((s) => ({
       id: s.symbol,
       symbol: s.symbol,
       name: s.symbol,
       cluster: communities[s.symbol] ?? 0,
       centrality: (s.eigenvector_centrality ?? 0) / maxC, // normalised -> drives node size
       raw: s.eigenvector_centrality ?? 0,
+      // The full centrality set, carried through for the inspector table below the graph.
+      metrics: {
+        eigenvector_centrality: s.eigenvector_centrality ?? null,
+        pagerank: s.pagerank ?? null,
+        degree_strength: s.degree_strength ?? null,
+        betweenness_centrality: s.betweenness_centrality ?? null,
+        closeness_centrality: s.closeness_centrality ?? null,
+      },
     }));
 
     const edges = (d.graph.edge_list ?? []).map(

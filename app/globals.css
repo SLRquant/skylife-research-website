@@ -689,33 +689,18 @@ a.schema-cell:hover { background: var(--ink-800); }
   background: var(--ink-800);
   margin-top: var(--space-3);
 }
-.infobox > summary {
+.infobox-head {
   display: flex; align-items: center; gap: var(--space-2);
   padding: var(--space-2) var(--space-3);
-  cursor: pointer; list-style: none; user-select: none;
 }
-.infobox > summary::-webkit-details-marker { display: none; }
-.infobox > summary:hover .label,
-.infobox[open] > summary .label { color: var(--text); }
-.infobox > summary:focus-visible { outline: 1px solid var(--signal); outline-offset: -1px; }
+.infobox-head .label { color: var(--text); }
 
 .infobox-mark {
   flex: none; width: 14px; height: 14px;
   display: grid; place-items: center;
-  border: 1px solid var(--rule-3); color: var(--label);
+  border: 1px solid var(--signal); color: var(--signal);
   font-family: var(--font-mono); font-size: 9px; line-height: 1;
 }
-.infobox[open] .infobox-mark { border-color: var(--signal); color: var(--signal); }
-
-/* A caret that rotates on open — the only motion here, and it earns its keep by
-   telling you the panel is a toggle rather than a static badge. */
-.infobox-chev {
-  margin-left: auto; flex: none; width: 6px; height: 6px;
-  border-right: 1px solid var(--label); border-bottom: 1px solid var(--label);
-  transform: rotate(45deg) translateY(-2px);
-  transition: transform 160ms ease;
-}
-.infobox[open] .infobox-chev { transform: rotate(225deg) translateY(-2px); }
 
 .infobox-body {
   padding: var(--space-3) var(--space-3) var(--space-4);
@@ -749,3 +734,42 @@ a.schema-cell:hover { background: var(--ink-800); }
 .key.is-locked { cursor: default; opacity: .82; }
 .key.is-locked:hover { border-color: var(--rule-2); background: var(--ink-800); }
 .key.on.is-locked:hover { background: var(--signal); }
+
+/* ---------- network-graph inspector: metric grid + all-stocks table ---------- */
+/* single-stock detail: five measures as labelled cells with value, rank and a bar */
+.ng-metric-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--space-3);
+}
+.ng-metric {
+  border: 1px solid var(--rule-1); padding: var(--space-3);
+  display: grid; grid-template-columns: 1fr auto; gap: var(--space-1) var(--space-2);
+  align-items: baseline;
+}
+.ng-metric-val { font-size: var(--text-md); text-align: right; }
+.ng-metric-rank {
+  grid-column: 1 / -1; font-family: var(--font-mono); font-size: var(--text-2xs);
+  letter-spacing: .08em; color: var(--label);
+}
+.ng-metric .drift-bar { grid-column: 1 / -1; }
+
+.ng-edges { display: grid; gap: var(--space-1); }
+
+/* the all-stocks table — dense, scannable, one row per name */
+.ng-table-wrap { overflow-x: auto; }
+.ng-table { width: 100%; border-collapse: collapse; font-size: var(--text-xs); }
+.ng-table th {
+  font-family: var(--font-mono); font-size: var(--text-2xs); font-weight: 500;
+  letter-spacing: .1em; text-transform: uppercase; color: var(--label);
+  text-align: left; padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--rule-2); white-space: nowrap;
+}
+.ng-table td {
+  padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--rule-1);
+  white-space: nowrap;
+}
+.ng-table .ng-num { text-align: right; font-variant-numeric: tabular-nums slashed-zero; }
+.ng-sym { display: flex; align-items: center; gap: var(--space-2); }
+.ng-row { cursor: pointer; transition: background var(--dur-fast) var(--ease-idx); }
+.ng-row:hover { background: var(--ink-700); }
+.ng-row:hover .ng-sym { color: var(--text); }
