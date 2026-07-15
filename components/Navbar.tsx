@@ -5,8 +5,8 @@ import Link from "next/link";
 import { Logo } from "./Logo";
 import { useAuth } from "@/lib/firebase/AuthProvider";
 
-/** The developer documentation portal (ReadMe). Swap for the custom domain once it's set up. */
-const DOCS_URL = "https://skylife-research.readme.io";
+/** The developer documentation portal — ReadMe served on our custom domain. */
+const DOCS_URL = "https://developers.skyliferesearch.com";
 
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);

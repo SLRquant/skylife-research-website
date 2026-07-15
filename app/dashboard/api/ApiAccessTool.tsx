@@ -8,7 +8,7 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { authedFetch } from "@/lib/firebase/client";
 import { useAuth } from "@/lib/firebase/AuthProvider";
 
-const DOCS_URL = "https://skylife-research.readme.io";
+const DOCS_URL = "https://developers.skyliferesearch.com";
 const CHART_URL =
   "https://graph-api.skyliferesearch.com/v1/graph-stats/chart" +
   "?interval=1d&lookback=60&periods=1&metrics=eigenvector_centrality" +
@@ -258,7 +258,7 @@ export function ApiAccessTool() {
                 <p style={{ marginTop: "var(--space-3)", color: "var(--text-2)", fontSize: "var(--text-sm)" }}>
                   Full parameter reference and endpoint docs:{" "}
                   <a href={DOCS_URL} target="_blank" rel="noopener noreferrer" className="mono">
-                    skylife-research.readme.io →
+                    developers.skyliferesearch.com →
                   </a>
                 </p>
               </div>
