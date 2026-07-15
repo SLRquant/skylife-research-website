@@ -7,7 +7,11 @@ export type GNode = {
   id: string;
   symbol: string;
   cluster: number;
-  centrality: number; // 0..1, normalised by the caller
+  centrality: number; // 0..1, normalised by the caller — drives node SIZE only
+  /** The un-normalised metric, when the caller has it. The hover readout must show THIS:
+      the normalised value is a size scale, and printing it as "eig" misreports the number
+      (the top node would always read 1.000 regardless of its true centrality). */
+  raw?: number;
 };
 export type GEdge = { source: string; target: string; weight: number; corr?: number };
 
@@ -36,7 +40,14 @@ const ALPHA_DECAY_COLD = 0.028; // first build
 const ALPHA_DECAY_WARM = 0.06;  // a morph: ~40 ticks, settles < 700ms (FOUNDATION §8.1)
 const REHEAT = 0.15;            // NOT 1.0 — the layout relaxes, it does not re-form
 
-const LABEL_TOP_K = 7; // text is the bottleneck — never draw 49 labels
+/**
+ * Labels: EVERY node asks for one; a greedy collision pass in centrality order decides who
+ * actually gets it. The most central names always win the space, less central ones appear
+ * wherever there's room — and zooming in frees room, so labels reveal progressively (the
+ * Obsidian-graph behaviour people intuitively expect). The top HUB_K hubs render brighter
+ * and a step larger, so the eye finds the market's core names first.
+ */
+const HUB_K = 7;
 
 const prefersReducedMotion = () =>
   typeof window !== "undefined" &&
@@ -346,7 +357,7 @@ export function GraphCanvas({
       x0 = Math.min(x0, n.x - n.s); y0 = Math.min(y0, n.y - n.s);
       x1 = Math.max(x1, n.x + n.s); y1 = Math.max(y1, n.y + n.s);
     }
-    const m = 40; // room for hulls + labels
+    const m = 56; // room for hulls + the label row under edge nodes
     const bw = Math.max(x1 - x0, 1);
     const bh = Math.max(y1 - y0, 1);
     const base = Math.min(rw / W, rh / H);
@@ -416,7 +427,20 @@ export function GraphCanvas({
       const hot = hoverRef.current ?? selRef.current;
       const hops = hopRef.current;
 
-      /* ---- hulls: engraved regions on the faceplate ---- */
+      /* ---- vignette: the plate reads as a recessed screen. Drawn FIRST (pure background
+              depth) so no node or label ever loses brightness to it. ---- */
+      const vg = ctx.createRadialGradient(
+        rw / 2, rh / 2, Math.min(rw, rh) * 0.30,
+        rw / 2, rh / 2, Math.max(rw, rh) * 0.75
+      );
+      vg.addColorStop(0, "rgba(0,0,0,0)");
+      vg.addColorStop(1, "rgba(0,0,0,0.30)");
+      ctx.fillStyle = vg;
+      ctx.fillRect(0, 0, rw, rh);
+
+      /* ---- hulls: a WHISPER of territory, not filled continents. The old alphas (.06 fill /
+              .25 stroke) stacked wherever communities overlap and turned the middle of the
+              plate to mud — the single biggest reason the graph read "dull". ---- */
       const groups = new Map<number, Array<[number, number]>>();
       for (const n of sim) {
         if (!groups.has(n.cluster)) groups.set(n.cluster, []);
@@ -427,78 +451,134 @@ export function GraphCanvas({
         const pad = hullPad.current.get(c);
         if (!pad) continue;
         pad.cur += (pad.target - pad.cur) * 0.12; // eases; does NOT oscillate forever
-        const poly = chaikin(inflate(convexHull(pts), pad.cur), 2);
+        const poly = chaikin(inflate(convexHull(pts), pad.cur), 3);
         if (poly.length < 3) continue;
         const col = sc.color(c);
         const p = new Path2D();
         p.moveTo(X(poly[0][0]), Y(poly[0][1]));
         for (let i = 1; i < poly.length; i++) p.lineTo(X(poly[i][0]), Y(poly[i][1]));
         p.closePath();
-        ctx.globalAlpha = hot ? 0.03 : 0.06;
+        // fill only — atmosphere, not shape. A visible outline is a claim the hull can't
+        // honestly make (convex hulls of overlapping communities draw wrong shapes).
+        ctx.globalAlpha = hot ? 0.015 : 0.035;
         ctx.fillStyle = col;
         ctx.fill(p);
-        ctx.globalAlpha = hot ? 0.12 : 0.25;
+        ctx.globalAlpha = hot ? 0.03 : 0.06;
         ctx.strokeStyle = col;
         ctx.lineWidth = 1;
         ctx.stroke(p);
       }
       ctx.globalAlpha = 1;
 
-      /* ---- edges: hairlines, 3-pass additive. Batched by bucket (Path2D), not per edge. ---- */
+      /* ---- edges ----
+         At rest: |corr| decides how much an edge is allowed to say. Three weight tiers —
+         strong ties visibly brighter/wider than weak ones — so the eye reads STRUCTURE
+         instead of a uniform hairball (142 identical lines was the hairball).
+         On hover: an edge lights only if BOTH endpoints are inside the traced neighbourhood
+         (either-endpoint lit half the graph), and its brightness falls off with hop ring, so
+         the BFS ripple has depth. Everything else drops to a ghost. */
       const es = edgesRef.current;
-      const lit = new Path2D();
-      const dim = new Path2D();
+      let wMin = Infinity, wMax = -Infinity;
       for (const e of es) {
-        const a = byIdRef.current.get(e.source);
-        const b = byIdRef.current.get(e.target);
-        if (!a || !b) continue;
-        const on = !hot || hops.has(e.source) || hops.has(e.target);
-        const p = on ? lit : dim;
-        p.moveTo(X(a.x), Y(a.y));
-        p.lineTo(X(b.x), Y(b.y));
+        const w = Math.abs(e.corr ?? e.weight);
+        if (w < wMin) wMin = w;
+        if (w > wMax) wMax = w;
       }
-      ctx.strokeStyle = "#8a93a6";
-      ctx.globalAlpha = 0.05;
-      ctx.lineWidth = 1;
-      ctx.stroke(dim);
+      const wSpan = wMax - wMin || 1;
 
-      // three passes, wide+faint -> narrow+bright. Real luminous depth; the widest stays faint,
-      // because this is a PLOT, not a neon sign.
-      ctx.globalCompositeOperation = "lighter";
-      const passes: Array<[number, number, string]> = [
-        [3.0, 0.045, "#7f8ba3"],
-        [1.6, 0.10, "#aab4c6"],
-        [0.8, 0.34, "#d7dde7"],
-      ];
-      for (const [lw, al, col] of passes) {
-        ctx.lineWidth = lw;
-        ctx.globalAlpha = al;
-        ctx.strokeStyle = col;
-        ctx.stroke(lit);
+      if (!hot) {
+        // Within-community edges are TINTED toward their cluster colour; cross-community
+        // edges stay neutral. Clusters then cohere visually with no hull geometry at all —
+        // the cleanest community encoding there is (colouring the ties, not the territory).
+        const cross = [new Path2D(), new Path2D(), new Path2D()];
+        const intra = new Map<number, [Path2D, Path2D, Path2D]>();
+        for (const e of es) {
+          const a = byIdRef.current.get(e.source);
+          const b = byIdRef.current.get(e.target);
+          if (!a || !b) continue;
+          const t = (Math.abs(e.corr ?? e.weight) - wMin) / wSpan;
+          const tier = t < 0.34 ? 0 : t < 0.67 ? 1 : 2;
+          let p: Path2D;
+          if (a.cluster === b.cluster) {
+            let set = intra.get(a.cluster);
+            if (!set) { set = [new Path2D(), new Path2D(), new Path2D()]; intra.set(a.cluster, set); }
+            p = set[tier];
+          } else {
+            p = cross[tier];
+          }
+          p.moveTo(X(a.x), Y(a.y));
+          p.lineTo(X(b.x), Y(b.y));
+        }
+        // weak ties barely present; the strongest correlations carry the picture
+        const lws = [0.6, 0.9, 1.4];
+        const crossAlpha = [0.06, 0.12, 0.22];
+        const crossCol = ["#7f8ba3", "#98a2b6", "#c3cbd9"];
+        for (let i = 0; i < 3; i++) {
+          ctx.lineWidth = lws[i];
+          ctx.globalAlpha = crossAlpha[i];
+          ctx.strokeStyle = crossCol[i];
+          ctx.stroke(cross[i]);
+        }
+        const intraAlpha = [0.10, 0.18, 0.32];
+        for (const [c, set] of intra) {
+          ctx.strokeStyle = sc.color(c);
+          for (let i = 0; i < 3; i++) {
+            ctx.lineWidth = lws[i];
+            ctx.globalAlpha = intraAlpha[i];
+            ctx.stroke(set[i]);
+          }
+        }
+        ctx.globalAlpha = 1;
+      } else {
+        const ghost = new Path2D();
+        const rings = [new Path2D(), new Path2D(), new Path2D()]; // by hop ring 0/1/2+
+        for (const e of es) {
+          const a = byIdRef.current.get(e.source);
+          const b = byIdRef.current.get(e.target);
+          if (!a || !b) continue;
+          const ha = hops.get(e.source);
+          const hb = hops.get(e.target);
+          const p = ha === undefined || hb === undefined
+            ? ghost
+            : rings[Math.min(Math.min(ha, hb), 2)];
+          p.moveTo(X(a.x), Y(a.y));
+          p.lineTo(X(b.x), Y(b.y));
+        }
+        ctx.strokeStyle = "#8a93a6";
+        ctx.globalAlpha = 0.02;
+        ctx.lineWidth = 0.8;
+        ctx.stroke(ghost);
+
+        // the traced neighbourhood: 3-pass additive on ring 0, fading through the rings.
+        // Wide+faint -> narrow+bright; the widest stays faint — a PLOT, not a neon sign.
+        ctx.globalCompositeOperation = "lighter";
+        const passes: Array<[number, number, string]> = [
+          [3.0, 0.045, "#7f8ba3"],
+          [1.6, 0.10, "#aab4c6"],
+          [0.8, 0.34, "#d7dde7"],
+        ];
+        const ringGain = [1, 0.45, 0.18];
+        for (let r = 0; r < 3; r++) {
+          for (const [lw, al, col] of passes) {
+            ctx.lineWidth = lw;
+            ctx.globalAlpha = al * ringGain[r];
+            ctx.strokeStyle = col;
+            ctx.stroke(rings[r]);
+          }
+        }
+        ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = 1;
       }
-      ctx.globalCompositeOperation = "source-over";
-      ctx.globalAlpha = 1;
 
       /* ---- nodes: CIRCLES (client direction — overrides DIRECTION-A §5 "squares"). ---- */
       const ranked = [...sim].sort((a, b) => b.centrality - a.centrality);
-      const labelSet = new Set(ranked.slice(0, LABEL_TOP_K).map((n) => n.id));
-      if (hot) {
-        labelSet.clear();
-        for (const [id, h] of hops) if (h <= 1) labelSet.add(id);
-      }
+      const hubs = new Set(ranked.slice(0, HUB_K).map((n) => n.id));
 
-      // label collision: draw in centrality order and drop any label whose box would
-      // overlap one already placed. An unreadable label is worse than no label.
-      // only labels contend for space with each other — reserving all 49 node boxes as well
-      // starved the layout and culled almost every label, which defeats the point.
-      const placed: Array<[number, number, number, number]> = [];
-      const fits = (x: number, y: number, w: number, h: number) => {
-        for (const [px, py, pw, ph] of placed) {
-          if (x < px + pw && px < x + w && y < py + ph && py < y + h) return false;
-        }
-        placed.push([x, y, w, h]);
-        return true;
-      };
+      // Nodes grow SUBLINEARLY with zoom (r ∝ k^0.6): zooming in opens space for labels
+      // instead of inflating balloons — the whole point of zooming here is to read names.
+      const kAdj = Math.pow(Math.max(view.current.k, 0.01), -0.4);
+      const rOf = (n: Sim, isHot: boolean) =>
+        Math.max(n.s * s * kAdj, 2.5) * (isHot ? 1.3 : 1);
 
       for (const n of sim) {
         const hop = hops.get(n.id);
@@ -507,15 +587,31 @@ export function GraphCanvas({
         const col = sc.color(n.cluster);
         const cx = X(n.x);
         const cy = Y(n.y);
-        const half = Math.max(n.s * s, 2.5) * (isHot ? 1.3 : 1);
+        const half = rOf(n, isHot);
 
-        ctx.globalAlpha = on ? 1 : 0.16;
+        ctx.globalAlpha = on ? 1 : 0.12;
+
+        // the traced neighbourhood glows in its own cluster colour — the payoff of hovering.
+        // shadowBlur is expensive, so it's spent ONLY on the ≤ dozen hover-lit nodes.
+        if (hot && hop !== undefined && hop <= 1) {
+          ctx.shadowColor = col;
+          ctx.shadowBlur = isHot ? 22 : 10;
+        }
 
         // fill: inlaid enamel in the faceplate
         ctx.fillStyle = col;
         ctx.beginPath();
         ctx.arc(cx, cy, half, 0, Math.PI * 2);
         ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // a hairline rim lifts every node off the edge lines beneath it — the single
+        // cheapest "crispness" trick a dark scatter has
+        ctx.strokeStyle = "rgba(232,234,237,0.35)";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, half, 0, Math.PI * 2);
+        ctx.stroke();
 
         // a node that MIGRATED gets an amber ring — displacement is a measured value
         if (n.drift > 26) {
@@ -537,22 +633,52 @@ export function GraphCanvas({
         ctx.globalAlpha = 1;
       }
 
-      // labels LAST, in centrality order, so the most-central name wins any collision
-      ctx.font = `500 10px ui-monospace, "SF Mono", Menlo, monospace`;
-      ctx.textAlign = "left";
+      /* ---- labels LAST, above everything ----
+         Every node asks; a greedy collision pass in centrality order decides. Two candidate
+         slots (below the node, then above) before giving up — zooming in frees space, so
+         more names appear the closer you look. Text renders with a dark HALO so it stays
+         legible even when it crosses an edge line; without the halo, labels sink into the
+         hairline layer (exactly what the old plate suffered from). */
+      const placed: Array<[number, number, number, number]> = [];
+      const collides = (x: number, y: number, w: number, h: number) => {
+        for (const [px, py, pw, ph] of placed) {
+          if (x < px + pw && px < x + w && y < py + ph && py < y + h) return true;
+        }
+        return false;
+      };
+
+      // during a hover, only the traced neighbourhood keeps labels — focus over census
+      const order = hot ? ranked.filter((n) => (hops.get(n.id) ?? 9) <= 1) : ranked;
+
+      ctx.textAlign = "center";
       ctx.textBaseline = "top";
-      for (const n of ranked) {
-        if (!labelSet.has(n.id)) continue;
+      ctx.lineJoin = "round";
+      for (const n of order) {
         const isHot = n.id === hot;
+        const isHub = hubs.has(n.id);
         const cx = X(n.x);
         const cy = Y(n.y);
-        const half = Math.max(n.s * s, 2.5) * (isHot ? 1.3 : 1);
+        const half = rOf(n, isHot);
+
+        const fpx = isHot ? 12 : isHub ? 11 : 9.5;
+        ctx.font = `${isHub || isHot ? 600 : 500} ${fpx}px ui-monospace, "SF Mono", Menlo, monospace`;
         const w = ctx.measureText(n.symbol).width;
-        const lx = cx - w / 2;
-        const ly = cy + half + 5;
-        if (!fits(lx - 3, ly - 2, w + 6, 13)) continue;
-        ctx.fillStyle = isHot ? "#e8eaed" : "#a8adb8";
-        ctx.fillText(n.symbol, lx, ly);
+        const fh = fpx + 3;
+
+        // slot 1: centred below the node; slot 2: centred above. First fit wins.
+        let ly = cy + half + 4;
+        if (collides(cx - w / 2 - 3, ly - 1, w + 6, fh)) {
+          ly = cy - half - 4 - fh;
+          if (collides(cx - w / 2 - 3, ly - 1, w + 6, fh)) continue;
+        }
+        placed.push([cx - w / 2 - 3, ly - 1, w + 6, fh]);
+
+        // halo first (the plate colour), then the ink
+        ctx.strokeStyle = "rgba(11,15,25,0.88)";
+        ctx.lineWidth = 3;
+        ctx.strokeText(n.symbol, cx, ly);
+        ctx.fillStyle = isHot ? "#ffffff" : isHub ? "#dfe3ea" : "#9aa3b2";
+        ctx.fillText(n.symbol, cx, ly);
       }
     };
 
@@ -706,7 +832,7 @@ export function GraphCanvas({
         ? {
             sym: n.symbol,
             cluster: scaleRef.current.label(n.cluster),
-            cent: n.centrality,
+            cent: n.raw ?? n.centrality,
             x: cx,
             y: cy,
           }
