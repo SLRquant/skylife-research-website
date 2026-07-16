@@ -32,6 +32,26 @@ export function Footer() {
             <Link href="/#contact">Contact</Link>
           </div>
           <div className="foot-col">
+            <h5 className="label">Connect</h5>
+            <a
+              href="https://www.linkedin.com/company/skylife-research/"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              LinkedIn ↗
+            </a>
+            <a href="mailto:aakashk@skyliferesearch.com?cc=sagark@skyliferesearch.com">
+              Email us
+            </a>
+            <a
+              href="https://developers.skyliferesearch.com"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Developer docs ↗
+            </a>
+          </div>
+          <div className="foot-col">
             <h5 className="label">Legal</h5>
             <a href="#">Terms</a>
             <a href="#">Privacy</a>

@@ -50,8 +50,8 @@ export function Contact() {
             <h2 className="sec-title unfurl">Ask us anything.</h2>
           </div>
           <p className="sec-desc">
-            Methodology, pricing, or an argument about whether modularity means anything at
-            n=49. We read every message.
+            Questions about the methodology, the data, API access, or the paid tier — or a wider
+            universe and features on request. We read and reply to every message.
           </p>
         </div>
 
@@ -64,14 +64,41 @@ export function Contact() {
             </p>
             <dl className="readout" style={{ marginTop: "var(--space-5)" }}>
               <div className="readout-cell">
-                <dt className="label">Response</dt>
-                <dd className="readout-val">24h</dd>
-              </div>
-              <div className="readout-cell">
                 <dt className="label">Based</dt>
-                <dd className="readout-val">Mumbai</dd>
+                <dd className="readout-val">Mumbai, Maharashtra, India</dd>
               </div>
             </dl>
+
+            {/* Direct routes, for people who'd rather not use a form. */}
+            <div
+              style={{
+                marginTop: "var(--space-5)",
+                display: "grid",
+                gap: "var(--space-2)",
+                fontSize: "var(--text-sm)",
+              }}
+            >
+              <div>
+                <span className="label">Email</span>{" "}
+                <a
+                  className="mono"
+                  href="mailto:aakashk@skyliferesearch.com?cc=sagark@skyliferesearch.com"
+                >
+                  aakashk@skyliferesearch.com
+                </a>
+              </div>
+              <div>
+                <span className="label">LinkedIn</span>{" "}
+                <a
+                  className="mono"
+                  href="https://www.linkedin.com/company/skylife-research/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Skylife Research ↗
+                </a>
+              </div>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit(onSubmit)} noValidate>

@@ -35,6 +35,30 @@ const ITEMS = [
     q: "What happens if the engine is down?",
     a: "The page says so. It will not fall back to invented placeholder numbers dressed up as today's market — an earlier version of this site did exactly that, and it was wrong.",
   },
+  {
+    q: "Is there an API?",
+    a: "Yes. Sign in with Google, open Dashboard → API access, and generate a 24-hour Bearer token. The full reference, with a live “Try It”, lives at developers.skyliferesearch.com. Every metric the Graph Stats tool shows is available as raw JSON.",
+  },
+  {
+    q: "What are the API rate limits?",
+    a: "On the free developer tier: 1 request per minute and 30 requests per day, per account. Every response carries X-RateLimit-* headers so you can pace yourself. Need more throughput? That's one of the things we lift on request.",
+  },
+  {
+    q: "Can I get more than the NIFTY-50 — NIFTY-500, my own symbols, more history?",
+    a: "Yes, on request. We already run wider universes (NIFTY-500 and custom baskets), more instruments, longer history, additional metrics, further graph methods, and more correlation estimators — they're simply gated behind a conversation rather than a self-serve toggle. Tell us what you need.",
+  },
+  {
+    q: "What does Paid cost?",
+    a: "It's TBD, and we won't invent a number to fill the cell. Paid unlocks the full engine — all intervals, all sparsifiers, deeper windows, unlimited runs — plus anything on the on-request list. Contact us and we'll scope it to what you actually need.",
+  },
+  {
+    q: "How do I get started?",
+    a: "Sign in with Google and open the Graph Stats tool — the free tier runs a real NIFTY-50 daily snapshot, no card required. Prefer code? Generate an API token from the dashboard and hit the endpoint directly.",
+  },
+  {
+    q: "Is this investment advice?",
+    a: "No. Skylife Research provides quantitative research and data, not advice. Graph centrality measures market structure — it is a research input, not an entry or exit signal, and trading involves risk.",
+  },
 ];
 
 export function FAQ() {

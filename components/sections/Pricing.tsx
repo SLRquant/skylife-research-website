@@ -17,16 +17,29 @@ import Link from "next/link";
  */
 
 const ROWS: Array<{ k: string; free: string; paid: string }> = [
+  { k: "Universe", free: "NIFTY-50", paid: "NIFTY-50 · NIFTY-500 · custom †" },
   { k: "Intervals", free: "1d", paid: "1m · 5m · 15m · 1h · 1d" },
-  { k: "Graph methods", free: "MST · kNN", paid: "MST · kNN · threshold · complete" },
-  { k: "Correlation", free: "Pearson · Spearman", paid: "Pearson · Spearman" },
-  { k: "Max lookback", free: "100 bars", paid: "300 bars" },
-  { k: "As-of days per run", free: "10", paid: "10" },
-  { k: "Symbols per run", free: "50", paid: "50" },
+  { k: "Graph methods", free: "MST · kNN", paid: "MST · kNN · threshold · complete · more †" },
+  { k: "Correlation", free: "Pearson · Spearman", paid: "Pearson · Spearman · more †" },
+  { k: "Centrality metrics", free: "All 5", paid: "5 + more †" },
+  { k: "Max lookback", free: "100 bars", paid: "300 bars · deeper †" },
+  { k: "As-of days per run", free: "10", paid: "10 · more †" },
+  { k: "Symbols per run", free: "50", paid: "50 · more †" },
   { k: "Runs", free: "5", paid: "Unlimited" },
-  { k: "Centrality metrics", free: "All 5", paid: "All 5" },
   { k: "CSV export", free: "Yes", paid: "Yes" },
   { k: "Network graph", free: "Yes", paid: "Yes" },
+];
+
+/** Capabilities we run but haven't put behind a self-serve toggle yet — real (the data and code
+ *  exist), offered on request rather than advertised as a button. `†` in the table points here. */
+const ON_REQUEST: string[] = [
+  "Wider universes — NIFTY-500 and custom baskets of your own symbols",
+  "More instruments and longer price history",
+  "Additional centrality metrics beyond the core five",
+  "Further graph constructions and sparsifiers",
+  "More correlation estimators (distance, partial, tail-dependence, …)",
+  "Deeper lookback windows and longer rolling series",
+  "Full intraday at scale, and bespoke research runs",
 ];
 
 export function Pricing() {
@@ -40,7 +53,7 @@ export function Pricing() {
           </div>
           <p className="sec-desc">
             The ladder is the engine&apos;s own limits — intervals, sparsifiers, window depth, run
-            count. There is no second product.
+            count. Paid unlocks the wider engine, and a lot more is available on request.
           </p>
         </div>
 
@@ -68,12 +81,29 @@ export function Pricing() {
           </tbody>
         </table>
 
+        {/* † — the on-request tier. Real capabilities (the data + code exist), gated behind a
+            conversation rather than a self-serve toggle. */}
+        <div className="spec-more">
+          <div className="spec-more-head">
+            <span className="label">† Paid — available on request</span>
+            <span className="sec-desc" style={{ margin: 0 }}>
+              We run more than the toggles above expose. Tell us what you need and we&apos;ll
+              set it up.
+            </span>
+          </div>
+          <ul className="spec-more-list">
+            {ON_REQUEST.map((f) => (
+              <li key={f}>{f}</li>
+            ))}
+          </ul>
+        </div>
+
         <div className="spec-foot">
           <Link className="btn btn-primary" href="/dashboard/graph-stats">
             Start on Free
           </Link>
           <Link className="btn btn-ghost" href="#contact">
-            Ask about Paid
+            Contact us for Paid & more
           </Link>
         </div>
 

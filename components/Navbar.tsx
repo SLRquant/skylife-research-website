@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Logo } from "./Logo";
 import { useAuth } from "@/lib/firebase/AuthProvider";
+import { signOutUser } from "@/lib/firebase/client";
 
 /** The developer documentation portal — ReadMe served on our custom domain. */
 const DOCS_URL = "https://developers.skyliferesearch.com";
@@ -12,6 +14,13 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [open, setOpen] = useState(false);
   const { user } = useAuth();
+  const router = useRouter();
+
+  const signOut = async () => {
+    await signOutUser();
+    setOpen(false);
+    router.push("/");
+  };
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -43,6 +52,12 @@ export function Navbar() {
           <Link className="btn btn-ghost" href={user ? "/dashboard" : "/auth/sign-in"}>
             {user ? "Dashboard" : "Sign in"}
           </Link>
+          {/* Sign out sits right beside Dashboard, and only exists while signed in. */}
+          {user && (
+            <button className="btn btn-ghost" onClick={signOut}>
+              Sign out
+            </button>
+          )}
           <button
             className="nav-toggle"
             aria-label="Menu"

@@ -6,6 +6,7 @@ import {
   GoogleAuthProvider,
   getAuth,
   signInWithPopup,
+  signOut as firebaseSignOut,
   type UserCredential,
 } from "firebase/auth";
 
@@ -53,6 +54,12 @@ export async function signInWithGoogle(): Promise<UserCredential> {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
   return signInWithPopup(auth, provider);
+}
+
+/** Sign the user out. No-op if Firebase isn't configured. */
+export async function signOutUser(): Promise<void> {
+  const auth = getFirebaseAuth();
+  if (auth) await firebaseSignOut(auth);
 }
 
 /**

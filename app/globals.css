@@ -450,7 +450,8 @@ a.schema-cell:hover { background: var(--ink-800); }
 }
 
 /* ---------- FAQ — two-column list, no accordion chrome ---------- */
-.faq { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-5) var(--space-6); }
+/* adaptive: flows 1 → 2 → 3 columns by available width instead of a hard 2-up */
+.faq { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: var(--space-4) var(--space-6); align-content: start; }
 .faq-item { border-top: 1px solid var(--rule-1); padding-top: var(--space-3); }
 .faq-q {
   font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 600;
@@ -773,3 +774,26 @@ a.schema-cell:hover { background: var(--ink-800); }
 .ng-row { cursor: pointer; transition: background var(--dur-fast) var(--ease-idx); }
 .ng-row:hover { background: var(--ink-700); }
 .ng-row:hover .ng-sym { color: var(--text); }
+
+/* ---------- spec: the on-request ("†") tier ---------- */
+.spec-more {
+  margin-top: var(--space-4);
+  border: 1px solid var(--rule-2);
+  border-left: 2px solid var(--signal);
+  background: var(--ink-800);
+  padding: var(--space-4);
+}
+.spec-more-head { display: grid; gap: var(--space-2); margin-bottom: var(--space-3); }
+.spec-more-head .label { color: var(--signal); }
+.spec-more-list {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-2) var(--space-4);
+}
+.spec-more-list li {
+  position: relative; padding-left: var(--space-3);
+  color: var(--text-2); font-size: var(--text-sm); line-height: 1.5;
+}
+.spec-more-list li::before {
+  content: "+"; position: absolute; left: 0; top: 0;
+  color: var(--signal); font-family: var(--font-mono);
+}
