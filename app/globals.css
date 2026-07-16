@@ -797,3 +797,16 @@ a.schema-cell:hover { background: var(--ink-800); }
   content: "+"; position: absolute; left: 0; top: 0;
   color: var(--signal); font-family: var(--font-mono);
 }
+
+/* ---------- icon links (contact) — square keys, no text ---------- */
+.contact-social { display: flex; gap: var(--space-2); }
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 42px; height: 42px;
+  border: 1px solid var(--rule-2); color: var(--text-2);
+  transition: border-color var(--dur-base) var(--ease-idx),
+              color var(--dur-base) var(--ease-idx),
+              background var(--dur-base) var(--ease-idx);
+}
+.icon-btn:hover { border-color: var(--rule-3); color: var(--text); background: var(--ink-700); }
+.icon-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }

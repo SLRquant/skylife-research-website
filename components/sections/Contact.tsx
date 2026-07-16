@@ -69,35 +69,32 @@ export function Contact() {
               </div>
             </dl>
 
-            {/* Direct routes, for people who'd rather not use a form. */}
-            <div
-              style={{
-                marginTop: "var(--space-5)",
-                display: "grid",
-                gap: "var(--space-2)",
-                fontSize: "var(--text-sm)",
-              }}
-            >
-              <div>
-                <span className="label">Email</span>{" "}
-                <a
-                  className="mono"
-                  href="mailto:aakashk@skyliferesearch.com?cc=sagark@skyliferesearch.com"
-                >
-                  aakashk@skyliferesearch.com
-                </a>
-              </div>
-              <div>
-                <span className="label">LinkedIn</span>{" "}
-                <a
-                  className="mono"
-                  href="https://www.linkedin.com/company/skylife-research/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  Skylife Research ↗
-                </a>
-              </div>
+            {/* Direct routes, for people who'd rather not use a form. Icons only — no address
+                on display. */}
+            <div className="contact-social" style={{ marginTop: "var(--space-5)" }}>
+              <a
+                className="icon-btn"
+                href="mailto:aakashk@skyliferesearch.com?cc=sagark@skyliferesearch.com"
+                aria-label="Email Skylife Research"
+                title="Email us"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="3" y="5" width="18" height="14" rx="1" />
+                  <path d="m3 6 9 7 9-7" />
+                </svg>
+              </a>
+              <a
+                className="icon-btn"
+                href="https://www.linkedin.com/company/skylife-research/"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Skylife Research on LinkedIn"
+                title="LinkedIn"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M4.98 3.5a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0zM.24 8.02h4.48V24H.24V8.02zM8.02 8.02h4.29v2.18h.06c.6-1.13 2.06-2.32 4.24-2.32 4.53 0 5.37 2.98 5.37 6.86V24h-4.48v-6.36c0-1.52-.03-3.47-2.12-3.47-2.12 0-2.44 1.65-2.44 3.36V24H8.02V8.02z" />
+                </svg>
+              </a>
             </div>
           </div>
 

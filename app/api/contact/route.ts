@@ -36,7 +36,9 @@ export async function POST(req: Request) {
 
   const { name, email, message } = parsed.data;
   const apiKey = process.env.RESEND_API_KEY;
-  const to = process.env.CONTACT_INBOX ?? "founders@skyliferesearch.com";
+  // Delivered to Aakash, with Sagar cc'd. Env vars override without a code change.
+  const to = process.env.CONTACT_INBOX ?? "aakashk@skyliferesearch.com";
+  const cc = process.env.CONTACT_CC ?? "sagark@skyliferesearch.com";
   const from =
     process.env.CONTACT_FROM ?? "Skylife Research <onboarding@resend.dev>";
 
@@ -51,6 +53,7 @@ export async function POST(req: Request) {
     await resend.emails.send({
       from,
       to,
+      cc,
       replyTo: email,
       subject: `New contact form: ${name}`,
       text: `From: ${name} <${email}>\n\n${message}`,
