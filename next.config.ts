@@ -8,15 +8,17 @@ import type { NextConfig } from "next";
  *   - Firebase Auth  -> identitytoolkit / securetoken / *.firebaseapp.com
  *   - Firestore      -> firestore.googleapis.com
  *   - Google sign-in -> accounts.google.com (popup) + gstatic (avatars)
+ *   - Google Analytics -> googletagmanager.com (gtag.js) + google-analytics.com (beacons)
+ *   - Vercel Analytics -> va.vercel-scripts.com (script) + vitals.vercel-insights.com (beacons)
  * The graph-stats API is NOT listed: the browser never calls it directly — our server does.
  */
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://accounts.google.com",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://apis.google.com https://accounts.google.com https://www.googletagmanager.com https://www.google-analytics.com https://va.vercel-scripts.com",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.googleusercontent.com https://*.gstatic.com",
+  "img-src 'self' data: blob: https://*.googleusercontent.com https://*.gstatic.com https://www.google-analytics.com",
   "font-src 'self' data:",
-  "connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://*.googleapis.com",
+  "connect-src 'self' https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://*.googleapis.com https://www.google-analytics.com https://www.googletagmanager.com https://vitals.vercel-insights.com",
   "frame-src 'self' https://accounts.google.com https://skyliferesearch.firebaseapp.com",
   "frame-ancestors 'none'", // clickjacking
   "base-uri 'self'",
