@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { signInWithGoogle } from "@/lib/firebase/client";
+import { trackSignUp, trackLeadConverted } from "@/lib/analytics";
 import { Navbar } from "@/components/Navbar";
 import { Plate } from "@/components/Plate";
 import { GoogleButton } from "@/components/GoogleButton";
@@ -41,6 +42,8 @@ export default function SignUpPage() {
               setBusy(true);
               try {
                 await signInWithGoogle();
+                trackSignUp();
+                trackLeadConverted();
                 router.replace("/dashboard");
               } finally {
                 setBusy(false);

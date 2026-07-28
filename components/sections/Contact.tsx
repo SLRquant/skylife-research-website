@@ -4,6 +4,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useState } from "react";
+import { trackContactLead } from "@/lib/analytics";
 
 const schema = z.object({
   name: z.string().min(1, "Required"),
@@ -35,6 +36,7 @@ export function Contact() {
         throw new Error(body.error ?? "Something went wrong");
       }
       setState({ ok: true });
+      trackContactLead();
       reset();
     } catch (err) {
       setState({ ok: false, err: err instanceof Error ? err.message : "Something went wrong" });
