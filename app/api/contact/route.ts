@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { Resend } from "resend";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { appendRow } from "@/lib/google-sheets";
 
 const schema = z.object({
   name: z.string().min(1).max(120),
@@ -41,6 +42,9 @@ export async function POST(req: Request) {
   const cc = process.env.CONTACT_CC ?? "sagark@skyliferesearch.com";
   const from =
     process.env.CONTACT_FROM ?? "Skylife Research <onboarding@resend.dev>";
+
+  // Fire-and-forget sheet log — runs regardless of Resend config.
+  appendRow("Contact Form", [new Date().toISOString(), name, email, message]);
 
   // If Resend isn't configured, still accept the submission (log it).
   if (!apiKey) {

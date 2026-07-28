@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { Resend } from "resend";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
+import { appendRow } from "@/lib/google-sheets";
 
 const schema = z.object({
   email: z.email(),
@@ -32,6 +33,9 @@ export async function POST(req: Request) {
   const { email } = parsed.data;
   const apiKey = process.env.RESEND_API_KEY;
   const audienceId = process.env.RESEND_AUDIENCE_ID;
+
+  // Fire-and-forget sheet log — runs regardless of Resend config.
+  appendRow("Newsletter", [new Date().toISOString(), email]);
 
   if (!apiKey || !audienceId) {
     console.log("[newsletter] (no RESEND config)", { email });

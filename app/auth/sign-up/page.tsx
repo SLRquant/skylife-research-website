@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { signInWithGoogle } from "@/lib/firebase/client";
+import { signInWithGoogle, authedFetch } from "@/lib/firebase/client";
 import { trackSignUp, trackLeadConverted } from "@/lib/analytics";
 import { Navbar } from "@/components/Navbar";
 import { Plate } from "@/components/Plate";
@@ -41,9 +41,14 @@ export default function SignUpPage() {
               setErr(null);
               setBusy(true);
               try {
-                await signInWithGoogle();
+                const cred = await signInWithGoogle();
                 trackSignUp();
                 trackLeadConverted();
+                // Log the sign-up to Google Sheets (fire-and-forget).
+                authedFetch("/api/auth/track-signup", {
+                  method: "POST",
+                  body: JSON.stringify({ name: cred.user.displayName ?? "" }),
+                }).catch(() => {});
                 router.replace("/dashboard");
               } finally {
                 setBusy(false);
