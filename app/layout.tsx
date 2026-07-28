@@ -37,6 +37,9 @@ export const metadata: Metadata = {
     type: "website",
   },
   icons: { icon: "/favicon.svg" },
+  verification: {
+    google: "LVSjDAW0_lKANsJAutMsHfTzbqmsLpnsqCOkWycsfHQ",
+  },
 };
 
 export const viewport: Viewport = { themeColor: "#0b0f19" };
