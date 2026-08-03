@@ -37,6 +37,7 @@ export function Navbar() {
         <Logo href="/" />
 
         <nav className={`nav-links${open ? " open" : ""}`} aria-label="Primary">
+          <Link href="/research" onClick={close}>Research</Link>
           <Link href="/#platform" onClick={close}>Platform</Link>
           <Link href="/network-graph" onClick={close}>Network</Link>
           <Link href="/#methodology" onClick={close}>Method</Link>
