@@ -86,12 +86,6 @@ export default function ResearchPage() {
               >
                 <div className="research-card-meta">
                   <span className="label">{article.category}</span>
-                  <span className="label">
-                    {new Date(article.publishDate).toLocaleDateString(
-                      "en-IN",
-                      { day: "numeric", month: "short", year: "numeric" }
-                    )}
-                  </span>
                   <span className="label">{article.readTime}</span>
                 </div>
                 <h2 className="research-card-title">{article.headline}</h2>

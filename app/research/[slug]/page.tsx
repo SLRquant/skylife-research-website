@@ -150,13 +150,6 @@ export default async function ArticlePage({ params }: PageProps) {
           <header className="article-header">
             <div className="article-meta">
               <span className="label">{article.category}</span>
-              <span className="label">
-                {new Date(article.publishDate).toLocaleDateString("en-IN", {
-                  day: "numeric",
-                  month: "long",
-                  year: "numeric",
-                })}
-              </span>
               <span className="label">{article.readTime} read</span>
             </div>
 
