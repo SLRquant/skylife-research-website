@@ -40,7 +40,7 @@ export function Navbar() {
           <Link href="/research" onClick={close}>Research</Link>
           <Link href="/#platform" onClick={close}>Platform</Link>
           <Link href="/network-graph" onClick={close}>Network</Link>
-          <Link href="/#methodology" onClick={close}>Method</Link>
+          <Link href="/how-it-works" onClick={close}>How It Works</Link>
           <Link href="/#pricing" onClick={close}>Spec</Link>
           {/* Developer docs live on ReadMe — a separate host, so open in a new tab. */}
           <a href={DOCS_URL} target="_blank" rel="noopener noreferrer" onClick={close}>

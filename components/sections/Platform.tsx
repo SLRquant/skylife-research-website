@@ -115,22 +115,22 @@ export function Platform() {
             </div>
           </Link>
 
-          {/* Honest: not built. Don't advertise a door that doesn't open. */}
-          <div className="schema-cell off">
+          <Link href="/how-it-works" className="schema-cell">
             <div className="schema-top">
-              <span className="label">03 / Portfolio</span>
-              <span className="label">In build</span>
+              <span className="label">03 / Method</span>
+              <span className="label">Deep dive</span>
             </div>
             <div className="schema-dia"><SchemaOverlap /></div>
-            <h3>Portfolio Overlap</h3>
+            <h3>How It Works</h3>
             <p>
-              Upload your book and see how much of it is the same bet wearing different tickers.
-              Not shipped yet — so we are not selling it.
+              The full methodology: from 1-minute bars to correlation graphs, community
+              detection, five centrality metrics, and why we killed the lead-lag product.
             </p>
             <div className="schema-foot">
-              <span className="label">Not available</span>
+              <span className="label">Pipeline &middot; Metrics &middot; Lead-lag</span>
+              <span className="label">Read &rarr;</span>
             </div>
-          </div>
+          </Link>
         </div>
       </div>
     </section>

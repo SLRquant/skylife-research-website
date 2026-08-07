@@ -812,6 +812,50 @@ a.schema-cell:hover { background: var(--ink-800); }
 .icon-btn:focus-visible { outline: 2px solid var(--text); outline-offset: 2px; }
 
 /* ==========================================================================
+   HOW IT WORKS — methodology deep-dive page
+   ========================================================================== */
+.hiw-page { padding: var(--row) 0 var(--space-6); }
+
+.hiw-hero { padding: var(--space-6) 0 var(--space-5); border-bottom: 1px solid var(--rule-1); }
+.hiw-title {
+  font-family: var(--font-mono); font-size: var(--text-2xl);
+  font-weight: 600; letter-spacing: -.04em; text-transform: uppercase;
+  line-height: .95; margin: var(--space-3) 0 var(--space-4);
+}
+.hiw-sub { color: var(--text-2); font-size: var(--text-md); max-width: 62ch; }
+
+.hiw-section { padding: var(--row) 0; border-top: 1px solid var(--rule-1); }
+
+.hiw-metrics {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  gap: var(--space-4);
+}
+.hiw-metric {
+  border: 1px solid var(--rule-1); padding: var(--space-4);
+  transition: border-color var(--dur-base) var(--ease-idx);
+}
+.hiw-metric:hover { border-color: var(--rule-3); }
+.hiw-metric h3 {
+  font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 600;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--text);
+  margin-bottom: var(--space-2);
+}
+.hiw-metric p { color: var(--text-2); font-size: var(--text-sm); }
+
+.hiw-text-block { max-width: 66ch; }
+.hiw-text-block p {
+  color: var(--text-2); font-size: var(--text-sm); line-height: 1.7;
+  margin-bottom: var(--space-3);
+}
+.hiw-text-block strong { color: var(--text); font-weight: 500; }
+
+.hiw-cta {
+  padding: var(--space-6) 0 var(--space-4);
+  border-top: 1px solid var(--rule-2);
+}
+.hiw-cta .sec-desc { margin-bottom: var(--space-4); }
+
+/* ==========================================================================
    RESEARCH — listing + article pages
    ========================================================================== */
 

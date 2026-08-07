@@ -28,7 +28,7 @@ export function Footer() {
           <div className="foot-col">
             <h5 className="label">Method</h5>
             <Link href="/research">Research</Link>
-            <Link href="/#methodology">Methodology</Link>
+            <Link href="/how-it-works">How It Works</Link>
             <Link href="/#faq">FAQ</Link>
             <Link href="/#contact">Contact</Link>
           </div>
