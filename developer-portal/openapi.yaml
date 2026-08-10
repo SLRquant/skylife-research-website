@@ -1,0 +1,748 @@
+openapi: 3.1.0
+
+info:
+  title: Skylife Research — Graph API
+  version: "1.0.0"
+  description: |
+    The **Skylife Research Graph API** exposes per-stock **network-centrality**
+    statistics over the Indian **NIFTY-50** universe.
+
+    Every session, we rebuild a **correlation graph** from recent price candles: each
+    stock is a node, and edges connect stocks whose returns move together. On top of
+    that graph we compute five classic centrality metrics per stock — how *central*,
+    *connected*, and *influential* each name is inside the current market structure.
+
+    Use it to answer questions like *"which stocks are the structural hubs of the
+    market right now?"* or *"is this name drifting toward the periphery of its
+    cluster?"*
+
+    ### Endpoints at a glance
+    | Endpoint | Auth | What it does |
+    |---|---|---|
+    | `GET /v1/demo/health` | none | Fixed health sample — Try It with **no token**. |
+    | `GET /v1/demo/chart` | none | Fixed canned snapshot — try the API with **no token**. |
+    | `GET /v1/graph-stats/chart` | Bearer JWT | Live centrality snapshot or rolling time series. |
+
+    ### Response envelope
+    Every response — success or error — uses one envelope:
+    ```json
+    { "success": true, "errors": null, "data": { … }, "meta": { … } }
+    ```
+    On failure, `success` is `false`, `data` is `null`, and `errors` is a list of
+    `{ "code", "message" }` objects.
+
+    ### Authentication
+    The live endpoint requires an `Authorization: Bearer <JWT>` header. Tokens are
+    per-user, last **24 hours**, and are minted from your dashboard at
+    skyliferesearch.com → **Dashboard → API access → Generate token**.
+
+    ### Rate limits
+    The live endpoint is limited to **1 request/minute** and **30 requests/day** per
+    user. Responses carry `X-RateLimit-*` headers; `429` responses add `Retry-After`.
+    The demo and health endpoints are unmetered.
+  contact:
+    name: Skylife Research
+    url: https://skyliferesearch.com
+    email: sagark@skyliferesearch.com
+
+servers:
+  - url: https://graph-api.skyliferesearch.com
+
+x-readme:
+  explorer-enabled: true
+  proxy-enabled: true
+  samples-languages:
+    - curl
+    - http
+    - python
+    - node
+    - javascript
+    - java
+    - csharp
+    - cplusplus
+    - c
+    - go
+    - php
+    - ruby
+    - rust
+    - swift
+    - kotlin
+    - powershell
+
+tags:
+  - name: System
+    description: Liveness and health.
+  - name: Demo
+    description: Zero-auth sample data of the same shape as the live endpoint.
+  - name: Graph Stats
+    description: Live per-stock network centrality over the NIFTY-50.
+
+security:
+  - bearerAuth: []
+
+paths:
+  /v1/demo/health:
+    get:
+      tags: [System]
+      summary: Health check (fixed sample)
+      description: >-
+        Public, no authentication. Returns a **fixed** health response — the timestamp never
+        changes — so pressing **Try It** always returns the exact same sample rather than a live
+        value. (The real service-liveness probe is `GET /health`.)
+      operationId: getDemoHealth
+      security: []
+      responses:
+        "200":
+          description: Service is up. Fixed sample response.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Envelope"
+              example:
+                success: true
+                errors: null
+                data:
+                  status: ok
+                  service: graph_stats
+                  time: "2026-07-15T00:00:00+00:00"
+                meta:
+                  demo: true
+
+  /v1/demo/chart:
+    get:
+      tags: [Demo]
+      summary: Demo snapshot (no auth)
+      description: |
+        Returns **fixed sample data** in the exact shape of the live snapshot payload
+        (`type: "snapshot"`), so you can try the API and inspect the response with **no
+        token**. The numbers are canned and do not change; use
+        `GET /v1/graph-stats/chart` for live data.
+      operationId: getDemoChart
+      security: []
+      responses:
+        "200":
+          description: Canned snapshot payload.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SnapshotEnvelope"
+              example:
+                $ref: "#/components/examples/SnapshotExample/value"
+
+  /v1/graph-stats/chart:
+    get:
+      tags: [Graph Stats]
+      summary: Per-stock centrality (snapshot or rolling)
+      description: |
+        Builds a correlation graph over a trailing window of candles and returns the
+        five centrality metrics per stock (`data.type = "snapshot"`).
+
+        ### 🔑 Need a token?
+        **[→ Generate your API token here](https://skyliferesearch.com/dashboard/api)** — sign in
+        with Google, click **Generate token**, and paste the 24-hour Bearer JWT into the
+        **Bearer** field in the "Try It" panel.
+
+        ### These parameters are fixed
+        On the public docs the query parameters below are **locked** to a standard NIFTY-50
+        daily snapshot, so you can try the API instantly without configuring anything.
+
+        **Want to change them?** Pick your own symbols, intervals (1m–1w), graph methods,
+        historical as-of dates, rolling time series, or pull more data —
+        **[contact us](https://skyliferesearch.com/#contact)** to unlock full parameter access
+        and play around with everything.
+
+        Requires a Bearer JWT. Rate limited to 1 request/minute and 30 requests/day per user.
+      operationId: getGraphStatsChart
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: universe
+          in: query
+          description: Stock universe. **Fixed** to the NIFTY-50 on public docs.
+          required: false
+          schema:
+            type: string
+            enum: ["nifty50"]
+            default: nifty50
+        - name: interval
+          in: query
+          description: Candle interval. **Fixed** to daily (`1d`) on public docs.
+          required: false
+          schema:
+            type: string
+            enum: ["1d"]
+            default: "1d"
+        - name: lookback
+          in: query
+          description: Bars in the trailing window. **Fixed** on public docs.
+          required: false
+          schema:
+            type: integer
+            enum: [60]
+            default: 60
+        - name: periods
+          in: query
+          description: "`1` = single snapshot. **Fixed** on public docs (rolling time series is a contact-to-unlock feature)."
+          required: false
+          schema:
+            type: integer
+            enum: [1]
+            default: 1
+        - name: graph_method
+          in: query
+          description: How the correlation matrix becomes a graph. **Fixed** to kNN on public docs.
+          required: false
+          schema:
+            type: string
+            enum: ["knn"]
+            default: knn
+        - name: knn_k
+          in: query
+          description: Nearest neighbours per node. **Fixed** on public docs.
+          required: false
+          schema:
+            type: integer
+            enum: [4]
+            default: 4
+        - name: corr_method
+          in: query
+          description: Correlation estimator. **Fixed** to Pearson on public docs.
+          required: false
+          schema:
+            type: string
+            enum: ["pearson"]
+            default: pearson
+        - name: metrics
+          in: query
+          description: The five centrality metrics. **Fixed** on public docs.
+          required: false
+          schema:
+            type: string
+            enum: ["degree_strength,eigenvector_centrality,betweenness_centrality,closeness_centrality,pagerank"]
+            default: "degree_strength,eigenvector_centrality,betweenness_centrality,closeness_centrality,pagerank"
+        - name: include_graph
+          in: query
+          description: Return the edge list + Louvain communities and modularity. **Fixed** on public docs.
+          required: false
+          schema:
+            type: boolean
+            enum: [true]
+            default: true
+      responses:
+        "200":
+          description: |
+            Success. The payload is a **snapshot** when `periods=1` and a **rolling**
+            time series when `periods>1`.
+          headers:
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Daily-Limit:
+              $ref: "#/components/headers/X-RateLimit-Daily-Limit"
+            X-RateLimit-Daily-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Daily-Remaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/X-RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: "#/components/schemas/SnapshotEnvelope"
+                  - $ref: "#/components/schemas/RollingEnvelope"
+              examples:
+                snapshot:
+                  summary: Snapshot (periods=1)
+                  value:
+                    $ref: "#/components/examples/SnapshotExample/value"
+                rolling:
+                  summary: Rolling time series (periods>1)
+                  value:
+                    $ref: "#/components/examples/RollingExample/value"
+        "401":
+          description: Missing, malformed, or expired Bearer token.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+              example:
+                success: false
+                errors:
+                  - code: UNAUTHORIZED
+                    message: "token expired — obtain a new one from Dashboard → API access"
+                data: null
+                meta:
+                  generated_at: "2026-07-15T09:32:11.482113+00:00"
+        "429":
+          description: |
+            Rate limit exceeded — either the per-minute limit (`RATE_LIMITED`) or the
+            daily quota (`DAILY_QUOTA_EXCEEDED`). Honour `Retry-After` before retrying.
+          headers:
+            Retry-After:
+              description: Seconds to wait before retrying.
+              schema:
+                type: integer
+              example: 47
+            X-RateLimit-Limit:
+              $ref: "#/components/headers/X-RateLimit-Limit"
+            X-RateLimit-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Remaining"
+            X-RateLimit-Daily-Limit:
+              $ref: "#/components/headers/X-RateLimit-Daily-Limit"
+            X-RateLimit-Daily-Remaining:
+              $ref: "#/components/headers/X-RateLimit-Daily-Remaining"
+            X-RateLimit-Reset:
+              $ref: "#/components/headers/X-RateLimit-Reset"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorEnvelope"
+              example:
+                success: false
+                errors:
+                  - code: RATE_LIMITED
+                    message: "rate limit exceeded: 1 request/minute. Retry in 47s."
+                data: null
+                meta:
+                  generated_at: "2026-07-15T09:32:11.482113+00:00"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        24-hour HS256 JWT. Obtain one at skyliferesearch.com → Dashboard → API access →
+        Generate token, then send it as `Authorization: Bearer <token>`.
+
+  headers:
+    X-RateLimit-Limit:
+      description: Per-minute request ceiling.
+      schema:
+        type: integer
+      example: 1
+    X-RateLimit-Remaining:
+      description: Requests remaining in the current minute window.
+      schema:
+        type: integer
+      example: 0
+    X-RateLimit-Daily-Limit:
+      description: Per-day request ceiling.
+      schema:
+        type: integer
+      example: 30
+    X-RateLimit-Daily-Remaining:
+      description: Requests remaining in the current day.
+      schema:
+        type: integer
+      example: 27
+    X-RateLimit-Reset:
+      description: Unix epoch seconds at which the current minute window resets.
+      schema:
+        type: integer
+      example: 1784106780
+
+  schemas:
+    ErrorItem:
+      type: object
+      description: A single error.
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code.
+          example: UNAUTHORIZED
+        message:
+          type: string
+          description: Human-readable detail.
+          example: "invalid or missing token"
+      required: [code, message]
+
+    Meta:
+      type: object
+      description: Non-payload metadata echoed on every response.
+      properties:
+        generated_at:
+          type: string
+          format: date-time
+          description: Server timestamp (UTC ISO-8601).
+        params:
+          type: object
+          description: The effective parameters used to build the response (after defaults).
+          additionalProperties: true
+        diagnostics:
+          type: object
+          description: Build diagnostics (counts, missing symbols, window bounds).
+          additionalProperties: true
+      additionalProperties: true
+
+    Envelope:
+      type: object
+      description: The universal response envelope.
+      properties:
+        success:
+          type: boolean
+        errors:
+          type: ["array", "null"]
+          items:
+            $ref: "#/components/schemas/ErrorItem"
+        data:
+          description: Payload on success; `null` on error.
+        meta:
+          $ref: "#/components/schemas/Meta"
+      required: [success, errors, data, meta]
+
+    ErrorEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            success:
+              const: false
+            data:
+              type: "null"
+
+    GraphEdge:
+      type: object
+      description: One weighted edge in the correlation graph.
+      properties:
+        source:
+          type: string
+          example: HDFCBANK
+        target:
+          type: string
+          example: ICICIBANK
+        weight:
+          type: ["number", "null"]
+          description: Edge weight (absolute correlation) used by the centrality metrics.
+          example: 0.78
+        corr:
+          type: ["number", "null"]
+          description: Signed Pearson/Spearman correlation of the two stocks' returns.
+          example: 0.78
+      required: [source, target]
+
+    GraphBlock:
+      type: object
+      description: |
+        Summary of the correlation graph. `edge_list`, `communities`, `n_communities`,
+        and `modularity` are present only when `include_graph=true`.
+      properties:
+        nodes:
+          type: integer
+          example: 50
+        edges:
+          type: integer
+          example: 49
+        method:
+          type: string
+          description: The graph construction method used.
+          example: mst
+        edge_list:
+          type: array
+          items:
+            $ref: "#/components/schemas/GraphEdge"
+        communities:
+          type: object
+          description: "Map of symbol → Louvain community id."
+          additionalProperties:
+            type: integer
+          example:
+            HDFCBANK: 0
+            ICICIBANK: 0
+            RELIANCE: 1
+        n_communities:
+          type: integer
+          example: 6
+        modularity:
+          type: ["number", "null"]
+          example: 0.412
+      required: [nodes, edges, method]
+
+    StockStat:
+      type: object
+      description: |
+        One stock's centrality metrics. Metric keys are only present when requested via
+        the `metrics` param (all five by default). `community` is present only when
+        `include_graph=true`.
+      properties:
+        symbol:
+          type: string
+          example: HDFCBANK
+        degree_strength:
+          type: ["number", "null"]
+          description: Normalized weighted degree — sum of incident absolute-correlation edge weights.
+          example: 1.0
+        eigenvector_centrality:
+          type: ["number", "null"]
+          description: Influence via well-connected neighbours (weighted eigenvector centrality).
+          example: 0.284119
+        betweenness_centrality:
+          type: ["number", "null"]
+          description: How often the node lies on shortest paths (distance-weighted, normalized).
+          example: 0.512821
+        closeness_centrality:
+          type: ["number", "null"]
+          description: Inverse mean shortest-path distance (distance-weighted).
+          example: 0.401338
+        pagerank:
+          type: ["number", "null"]
+          description: Stationary random-walk importance (weight-biased PageRank).
+          example: 0.041902
+        community:
+          type: ["integer", "null"]
+          description: Louvain community id (only when `include_graph=true`).
+          example: 0
+      required: [symbol]
+
+    SnapshotData:
+      type: object
+      description: Payload when `periods=1`.
+      properties:
+        type:
+          const: snapshot
+        asof_date:
+          type: ["string", "null"]
+          format: date-time
+          description: Timestamp of the last bar in the window.
+          example: "2026-07-14T15:30:00"
+        metrics:
+          type: array
+          items:
+            type: string
+          example:
+            - degree_strength
+            - eigenvector_centrality
+            - betweenness_centrality
+            - closeness_centrality
+            - pagerank
+        graph:
+          $ref: "#/components/schemas/GraphBlock"
+        stocks:
+          type: array
+          items:
+            $ref: "#/components/schemas/StockStat"
+      required: [type, metrics, graph, stocks]
+
+    RollingSeriesPoint:
+      type: object
+      description: One as-of date's metric values for a single stock.
+      properties:
+        date:
+          type: string
+          format: date-time
+          example: "2026-07-14T15:30:00"
+      additionalProperties:
+        type: ["number", "null"]
+      required: [date]
+
+    RollingSeries:
+      type: object
+      description: A single stock's metric time series.
+      properties:
+        symbol:
+          type: string
+          example: HDFCBANK
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/RollingSeriesPoint"
+        community:
+          type: ["integer", "null"]
+          description: Louvain community id of the latest graph (only when `include_graph=true`).
+      required: [symbol, points]
+
+    RollingData:
+      type: object
+      description: Payload when `periods>1`.
+      properties:
+        type:
+          const: rolling
+        asof_dates:
+          type: array
+          items:
+            type: string
+            format: date-time
+          example:
+            - "2026-07-10T15:30:00"
+            - "2026-07-11T15:30:00"
+            - "2026-07-14T15:30:00"
+        metrics:
+          type: array
+          items:
+            type: string
+        series:
+          type: array
+          items:
+            $ref: "#/components/schemas/RollingSeries"
+        latest_graph:
+          allOf:
+            - $ref: "#/components/schemas/GraphBlock"
+            - type: object
+              properties:
+                asof_date:
+                  type: string
+                  format: date-time
+          description: Attached only when `include_graph=true` — the graph for the latest as-of date.
+      required: [type, asof_dates, metrics, series]
+
+    SnapshotEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/SnapshotData"
+
+    RollingEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/Envelope"
+        - type: object
+          properties:
+            data:
+              $ref: "#/components/schemas/RollingData"
+
+  examples:
+    SnapshotExample:
+      summary: Snapshot with include_graph=true
+      value:
+        success: true
+        errors: null
+        data:
+          type: snapshot
+          asof_date: "2026-07-14T15:30:00"
+          metrics:
+            - degree_strength
+            - eigenvector_centrality
+            - betweenness_centrality
+            - closeness_centrality
+            - pagerank
+          graph:
+            nodes: 5
+            edges: 4
+            method: mst
+            edge_list:
+              - { source: HDFCBANK, target: ICICIBANK, weight: 0.812, corr: 0.812 }
+              - { source: ICICIBANK, target: RELIANCE, weight: 0.564, corr: 0.564 }
+              - { source: RELIANCE, target: INFY, weight: 0.421, corr: 0.421 }
+              - { source: INFY, target: TCS, weight: 0.733, corr: 0.733 }
+            communities:
+              HDFCBANK: 0
+              ICICIBANK: 0
+              RELIANCE: 0
+              INFY: 1
+              TCS: 1
+            n_communities: 2
+            modularity: 0.372
+          stocks:
+            - symbol: HDFCBANK
+              degree_strength: 0.812
+              eigenvector_centrality: 0.284119
+              betweenness_centrality: 0.0
+              closeness_centrality: 0.36
+              pagerank: 0.171204
+              community: 0
+            - symbol: ICICIBANK
+              degree_strength: 1.0
+              eigenvector_centrality: 0.512874
+              betweenness_centrality: 0.666667
+              closeness_centrality: 0.5
+              pagerank: 0.244902
+              community: 0
+            - symbol: RELIANCE
+              degree_strength: 0.842
+              eigenvector_centrality: 0.478201
+              betweenness_centrality: 0.666667
+              closeness_centrality: 0.571429
+              pagerank: 0.223188
+              community: 0
+            - symbol: INFY
+              degree_strength: 0.796
+              eigenvector_centrality: 0.451118
+              betweenness_centrality: 0.5
+              closeness_centrality: 0.5
+              pagerank: 0.196503
+              community: 1
+            - symbol: TCS
+              degree_strength: 0.733
+              eigenvector_centrality: 0.286044
+              betweenness_centrality: 0.0
+              closeness_centrality: 0.363636
+              pagerank: 0.164203
+              community: 1
+        meta:
+          generated_at: "2026-07-15T09:32:11.482113+00:00"
+          params:
+            universe: nifty50
+            interval: "1d"
+            lookback: 60
+            graph_method: mst
+            knn_k: null
+            corr_threshold: null
+            corr_method: pearson
+            metrics:
+              - degree_strength
+              - eigenvector_centrality
+              - betweenness_centrality
+              - closeness_centrality
+              - pagerank
+          diagnostics:
+            n_requested: 50
+            n_in_graph: 5
+            n_edges: 4
+            n_return_bars: 60
+            missing_symbols: []
+            fetch_failures: {}
+            dropped_insufficient_bars: []
+            end_used: "2026-07-14 15:30:00"
+            window_start: "2026-04-21 15:30:00"
+
+    RollingExample:
+      summary: Rolling time series (periods=3)
+      value:
+        success: true
+        errors: null
+        data:
+          type: rolling
+          asof_dates:
+            - "2026-07-10T15:30:00"
+            - "2026-07-11T15:30:00"
+            - "2026-07-14T15:30:00"
+          metrics:
+            - degree_strength
+            - pagerank
+          series:
+            - symbol: HDFCBANK
+              points:
+                - { date: "2026-07-10T15:30:00", degree_strength: 0.781, pagerank: 0.162044 }
+                - { date: "2026-07-11T15:30:00", degree_strength: 0.804, pagerank: 0.168310 }
+                - { date: "2026-07-14T15:30:00", degree_strength: 0.812, pagerank: 0.171204 }
+            - symbol: ICICIBANK
+              points:
+                - { date: "2026-07-10T15:30:00", degree_strength: 0.972, pagerank: 0.238117 }
+                - { date: "2026-07-11T15:30:00", degree_strength: 0.988, pagerank: 0.241902 }
+                - { date: "2026-07-14T15:30:00", degree_strength: 1.0, pagerank: 0.244902 }
+        meta:
+          generated_at: "2026-07-15T09:32:11.482113+00:00"
+          params:
+            universe: nifty50
+            interval: "1d"
+            lookback: 60
+            periods: 3
+            step: 1
+            graph_method: mst
+            corr_method: pearson
+            metrics:
+              - degree_strength
+              - pagerank
+          diagnostics:
+            n_in_universe: 50
+            n_symbols: 50
+            n_asof_days: 3
+            window_bars: 60
+            missing_symbols: []
+            fetch_failures: {}
+            dropped_insufficient_bars: []
+            end_used: "2026-07-14 15:30:00"
+            first_asof: "2026-07-10 15:30:00"
+            last_asof: "2026-07-14 15:30:00"
