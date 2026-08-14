@@ -40,3 +40,4 @@ yarn-error.log*
 dev.log
 .playwright-mcp/
 design/artifacts/
+.env*

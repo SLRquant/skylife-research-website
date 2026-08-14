@@ -28,6 +28,7 @@ const martianMono = Martian_Mono({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://skyliferesearch.com"),
   title: "Skylife Research — The market is not a list.",
   description:
     "Per-stock network centrality on the NIFTY-50, rebuilt from 1-minute bars. Watch the correlation graph re-form as you change the estimation window — and see how much of a stock's structural role is real.",
@@ -37,6 +38,9 @@ export const metadata: Metadata = {
     type: "website",
   },
   icons: { icon: "/favicon.svg" },
+  alternates: {
+    canonical: "/",
+  },
   verification: {
     google: "LVSjDAW0_lKANsJAutMsHfTzbqmsLpnsqCOkWycsfHQ",
   },
