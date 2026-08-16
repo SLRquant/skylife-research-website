@@ -43,18 +43,6 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
 
-  // ── www → non-www 301 redirect (consolidate Google rankings) ──
-  async redirects() {
-    return [
-      {
-        source: "/:path*",
-        has: [{ type: "host", value: "www.skyliferesearch.com" }],
-        destination: "https://skyliferesearch.com/:path*",
-        permanent: true,
-      },
-    ];
-  },
-
   /**
    * firebase-admin must NOT be bundled — it has to be require()d from node_modules at runtime.
    *
